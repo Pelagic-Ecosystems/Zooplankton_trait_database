@@ -1,0 +1,276 @@
+---
+title: "Taxonomic coverage at level 2 data"
+author: "Patrick Pata"
+date: '2023-01-11'
+output: html_document
+---
+
+This file provides the scripts to produce supplementary figure 1 and the input files for making figure 4. Summary of level 2 data coverage as the number of trait records per species. The phylogenetic dendrogram and trait distribution figure was generated in the iTOL website and annotated in photoshop. This script thus demonstrates how the input files to generate the figure are created.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(gplots) # for converting color names to hex format
+library(phyr)
+library(rotl) # for phylo distance
+
+source("toolkit.R")
+```
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+
+infol <- "data_input/Trait_dataset_level2/"
+outfol <- "data_input/Trait_dataset_level2/"
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+
+# The zooplankton phylogenetic tree file extracted from the Tree of Life database and subset for species found in the zooplankton trait dataset.
+# load("data_input/phylo_tree_trait_level2_20230501.RData")
+```
+
+# Supp Figure 1. Distribution of the total number of traits per species.
+Use the curated level 2 data as basis for taxonomic converage
+```{r, warning=FALSE}
+# Create dataframe of scientific names at species level for data at trait level 2 (will have same list as level 1) to list number of traits per species. This dataframe will be used in searching for ott_ids.
+taxon.count <- traits.lvl2 %>% 
+  filter(valueType %notin% c("binary")) %>% 
+  group_by(taxonID) %>% 
+  count() %>% 
+  ungroup() %>% 
+  arrange(-n) %>% 
+  left_join(distinct(taxonomy, taxonID, .keep_all = T ), by = "taxonID") %>% 
+  # only plot subspecies and species level
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(majorgroup != "Cubozoan") %>% 
+  filter(!is.na(aphiaID)) %>% 
+  # for subpecies and names with parentheses, remove these
+  mutate(species = gsub(r"{\s*\([^\)]+\)}","",as.character(scientificName))) %>% 
+  # remove duplicated subspecies name for ott search
+  # mutate(species = paste(unique(unlist(strsplit(species, split = " "))),
+  #                        collapse = " ")) %>%
+  mutate(species = word(species,1,2)) %>%
+  relocate(taxonID,species) %>% 
+  # Prepare for ott search
+  mutate(search_string = tolower(species)) %>% 
+  dplyr::select(-c(verbatimScientificName))
+
+# Plot distribution of number of trait information per taxa
+taxon.count.sum <- taxon.count %>% 
+  rename(ntraits = n) %>% 
+  group_by(ntraits) %>% 
+  summarise(ntaxa = n()) %>% 
+  ungroup() %>% 
+  mutate(cum = cumsum(ntaxa) ) %>% 
+  mutate(perc = cum/ sum(ntaxa) * 100) %>% 
+  mutate(perc.rev = 100 - perc)
+
+# For y axis scaling
+ylim.prim <- c(0, 2000)   # in this example, precipitation
+ylim.sec <- c(0, 100)
+b <- diff(ylim.prim)/diff(ylim.sec)
+a <- ylim.prim[1] - b*ylim.sec[1]
+
+ggplot(taxon.count.sum, aes(ntraits, ntaxa)) +
+  geom_point() +
+  theme_bw() +
+  geom_segment( aes(x=ntraits, xend=ntraits, y=0, yend=ntaxa)) +
+  geom_line(aes(y = a + perc*b), linetype = "dashed") +
+  scale_y_continuous("Number of species", 
+                     sec.axis = sec_axis(~ (. -a)/b, name = "% of species")) + 
+  scale_x_continuous("Number of traits per species",
+                     breaks = c(0,10,20,30,40,50,60))
+
+ggsave(filename = "figures/supp_fig_1_num_traits_by_species.png",
+    width = 7, height=3, units = "in", dpi = 300)
+```
+
+# For Figure 4. Summary of level 2 data coverage as the number of trait records per species.
+## Convert taxonomy table to phylogenetic tree
+```{r, warning=FALSE}
+resolved_names <- rotl::tnrs_match_names(taxon.count$species, 
+                                   context_name = "Animals") %>% 
+  # ott ids removed because does not match the actual species, 
+  filter(ott_id %notin% c(3681135,2875111,1026631,3589733)) %>% 
+  # exclude ott ids that prevent tree builing
+  filter(ott_id %notin% c(2946383,2946644,2951566,2957044,3589733,3681127,3681811,
+            3683799,4669348,4712943,4984796,5092841,5296504,5520904,615879,3683796,
+            624879,7489044,7839149,787131))
+  
+
+taxon.count <- taxon.count %>% 
+  left_join(dplyr::select(resolved_names, search_string, ott_id),
+            by = "search_string") %>% 
+  # Mesopodopsis sp is in wrong part of tree so exclude for now
+  filter(genus %notin% c("Mesopodopsis")) %>% 
+  filter(!is.na(ott_id)) %>% 
+  relocate(ott_id, species, n, majorgroup) %>% 
+  distinct(ott_id, .keep_all = TRUE)
+  
+
+# order by major group
+taxon.count <- taxon.count %>% 
+  arrange(phylum,class,order,family,genus)
+
+# Create the zooplankton phylogenetic tree based on the curated taxon list
+zoop_tree <- rotl::tol_induced_subtree(ott_ids = taxon.count$ott_id)
+
+# Barneche et al. (2018): Derive variance-covariance matrix based on Brownian evolution from the phylogenetic tree. If branch length are unknown, set to length equal to number of descendant tips minus one (arbitrary method of Grafen 1989).
+# compute branch lengths
+zoop_tree <- ape::compute.brlen(zoop_tree, method = 'Grafen')
+
+
+# Assign colors to major groups
+majorgroup.colors <- data.frame(
+  majorgroup = c("Calanoid","Non-calanoid","Mysid","Amphipod","Decapod",
+                 "Euphausiid","Ostracod","Polychaete","Pteropod",
+                 "Chaetognath","Appendicularian","Thaliacean","Cladoceran",
+                 "Hydromedusae","Siphonophore","Scyphomedusae","Ctenophore"),
+  color = c("blue","navy","slateblue2","cornflowerblue","cyan2","forestgreen",
+            "seagreen3","tan1","green2",
+            "darkorchid4","violetred","hotpink3","saddlebrown",
+            "tomato1","goldenrod3","yellow2","red4"))
+
+
+# Create table of tips with updated labels and grouping for color
+tree.tips <- data.frame(label = zoop_tree$tip.label) %>% 
+  mutate(ott_id = as.numeric(sub(".*ott","",label))) %>% 
+  left_join(dplyr::select(taxon.count, ott_id, species, n, majorgroup,
+                          phylum, class), by = "ott_id") %>% 
+  left_join(majorgroup.colors, by = "majorgroup")
+
+# # Save the phylo tree object
+# save(zoop_tree, tree.tips, taxon.count,
+#      file = "data_output/phylo_tree_trait_level2.RData")
+```
+
+
+## Prepare files for annotation in iTOL
+Create files which will be loaded into iTOL (https://itol.embl.de/) where the figure will be generated. The figure is then annotated in photoshop to add zooplankton icons and percent trait data coverage.
+```{r}
+zoop_tree_export <- zoop_tree
+zoop_tree_export$tip.label <-  sub(".*ott","", zoop_tree$tip.label)
+zoop_tree_export$node.label <- sub(".*ott","", zoop_tree$node.label)
+
+# Write tree to file for iTOL
+ape::write.tree(zoop_tree_export, file='data_output/zoop_tree_species_1trait.txt')
+
+# Export to labels to LABELS.txt template file
+writeLines(c("LABELS","SEPARATOR COMMA","","DATA"), 
+           "data_output/labels_template.txt")
+# labels_template.txt
+# NODE_ID, LABEL, CLASS
+labels <- tree.tips %>% 
+  dplyr::select(ott_id, species, majorgroup)
+
+write.table(labels, file="data_output/labels_template.txt",
+            append = TRUE, sep = ",",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+# Export label style to DATASET_STYLE.txt template file
+writeLines(c("DATASET_STYLE","SEPARATOR COMMA","",
+             "DATASET_LABEL,Color labels by majorgroup","",
+             "COLOR,#ffff00","",
+             "DATA"), 
+           "data_output/dataset_style_template.txt")
+
+# ID,TYPE,WHAT,COLOR,WIDTH_OR_SIZE_FACTOR,STYLE,BACKGROUND_COLOR
+styletab <- tree.tips %>% 
+  dplyr::select(ott_id, color) %>% 
+  mutate(color = gplots::col2hex(color)) %>% 
+  mutate(type = "label", what = "node", textcolor = "#000000",
+         fontsize = "3", style = "italic",
+         #can specific background color
+         bgcolor = gplots::col2hex(color)) %>%  
+  dplyr::select(-color)
+
+write.table(styletab, file = "data_output/dataset_style_template.txt",
+            append = TRUE, sep = ",",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+
+# COLOR STRIPS by major group
+writeLines(c("DATASET_COLORSTRIP","SEPARATOR COMMA","",
+             "DATASET_LABEL,Color strip by majorgroup","",
+             "COLOR,#7FFFD4","",
+             "COLOR_BRANCHES 1",
+             "COMPLETE_BORDER 1",
+             "SHOW_STRIP_LABELS 1",
+             "STRIP_WIDTH 40",
+             "SHOW_LABELS 0",
+             "DATA"), 
+           "data_output/dataset_colorstrip_template.txt")
+striptab <- tree.tips %>% 
+  dplyr::select(ott_id,color,majorgroup) %>% 
+  mutate(color = gplots::col2hex(color))
+
+
+write.table(striptab, file = "data_output/dataset_colorstrip_template.txt",
+            append = TRUE, sep = ",",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+
+# Annotate with a simple bar chart of N trait records
+writeLines(c("DATASET_SIMPLEBAR","SEPARATOR COMMA","",
+             "DATASET_LABEL,Number of trait records","",
+             "COLOR,#666666","",
+             "DATA"), 
+           "data_output/dataset_simplebar_template.txt")
+
+bartab <- tree.tips %>% 
+  dplyr::select(ott_id,n,color) %>% 
+  mutate(color = gplots::col2hex(color)) 
+
+write.table(bartab, file = "data_output/dataset_simplebar_template.txt",
+            append = TRUE, sep = ",",
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+
+## Calculate the percent trait coverage per major group using in annotating Figure 4
+```{r}
+major.group.summary <- taxon.count %>% 
+  group_by(majorgroup) %>% 
+  mutate(Nspecies = n()) %>% 
+  # % more than 1 trait
+  mutate(perc.1 = if_else(n > 1, 1, 0),
+         perc.1 = sum(perc.1)/Nspecies*100,
+         # % more than 5 traits
+         perc.5 = if_else(n > 5, 1, 0),
+         perc.5 = sum(perc.5)/Nspecies*100,
+         # % more than 10 traits
+         perc.10 = if_else(n > 10, 1, 0),
+         perc.10 = sum(perc.10)/Nspecies*100,
+         nmax = max(n)) %>% 
+    distinct(majorgroup, Nspecies, perc.1, perc.5, perc.10, nmax) %>% 
+  mutate(perc.5.round = round(perc.5)) %>% 
+  relocate(majorgroup, Nspecies, perc.5.round, nmax)
+```
+
+
+# Open a NEXUS file exported from iTOL
+```{r, eval = FALSE, fig.width = 5, fig.height = 5}
+# nexus <- ape::read.nexus("data_output/phylo_tree/itol_tree_nexus.txt")
+# ape::plot.phylo(nexus,  show.tip.label = FALSE)
+```
+
+
+

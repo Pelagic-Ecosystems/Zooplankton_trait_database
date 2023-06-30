@@ -1,0 +1,118 @@
+﻿stageID,lifeStage,verbatimLifeStage,majorgroup,notes
+1,adult,A,all,
+1,adult,Adult,all,
+1,adult,adult,all,
+1,adult,Full,all,
+2,female,F,all,adult female
+2,female,female,all,adult female
+2,female,females,all,adult female
+2,female,Full F,all,adult female
+3,male,Full M,all,adult male
+3,male,M,all,adult male
+3,male,male,all,adult male
+4,male/unsexed,male/unsexed,all,used by WORMS for fish
+5,sexual,sexual,all,
+6,asexual,asexual,all,
+7,egg,Egg,all,
+8,larvae,larva,all,
+8,larvae,larvae,all,
+9,juvenile,juv,all,
+9,juvenile,juvenil,all,
+9,juvenile,juvenile,all,
+9,juvenile,Juvenile,all,
+10,female instar,First Instar,amphipods,
+11,female instar 9,Female Instar 9,amphipods,
+12,female instar 10,Female Instar 10,amphipods,
+13,female instar 11,Female Instar 11,amphipods,
+14,female instar 12,Female Instar 12,amphipods,
+15,female instar 15,F Instar 15,amphipods,
+16,female instar 16,F Instar 16,amphipods,
+17,female instar 17,F Instar 17,amphipods,
+18,female instar 18,F Instar 18,amphipods,
+19,female instar 19,F Instar 19,amphipods,
+20,instar 4-10,Instar 4 to 10,amphipods,
+21,male instar 10,Male Instar 10,amphipods,
+22,male instar 11,Male Instar 11,amphipods,
+23,N1,NI,copepods,
+24,N1-2,NI-II,copepods,
+25,N2,NII,copepods,
+26,N2-3,NII-III,copepods,
+27,N3,NIII,copepods,
+28,N4,NIV,copepods,
+29,N5,NV,copepods,
+30,N5-6,NV-VI,copepods,
+31,N6,NVI,copepods,
+32,nauplii,N,copepods,
+32,nauplii,nauplii,copepods,
+32,nauplii,nauplius,copepods,
+33,C1,CI,copepods,
+34,C1-3,CI-III,copepods,
+35,C2,CII,copepods,
+36,C2-3,C2-3,copepods,
+37,C3,CIII,copepods,
+38,C4,C4,copepods,
+38,C4,CIV,copepods,
+38,C4,IV,copepods,
+39,C4 F,CIV F,copepods,
+40,C4 M,CIV M,copepods,
+41,C4-5,C4-5,copepods,
+41,C4-5,IV-V,copepods,
+42,C5,C5,copepods,
+42,C5,CV,copepods,
+42,C5,V,copepods,
+43,C5 F,CV F,copepods,
+44,C5 M,CV M,copepods,
+45,C5-6 F,CV+CVI F,copepods,
+45,C5-6 M,CV+CVI M,copepods,
+46,copepodite,C,copepods,
+46,copepodite,copepodits,copepods,
+47,first zoea,First Zoea,crustaceans,
+48,last zoea,Last Zoea,crustaceans,
+49,zoea,zoea,crustaceans,
+50,megalopa,megalopa,crustaceans,
+51,mysis larva,mysis,crustaceans,
+51,mysis larva,mysis larva,crustaceans,
+52,VII,VII,ostracods,
+53,VII F,VIII F,ostracods,
+54,furcilia,Fucilia III,euphausiids,Note that substages are generalized to furcilia for the database.
+54,furcilia,late furcilia,euphausiids,Note that substages are generalized to furcilia for the database.
+54,furcilia,F1-F2,euphausiids,Note that substages are generalized to furcilia for the database.
+54,furcilia,F1-F3,euphausiids,Note that substages are generalized to furcilia for the database.
+54,furcilia,F4-F5,euphausiids,Note that substages are generalized to furcilia for the database.
+55,colony,colony,"cnidarians, tunicates",
+55,colony,cormidia/colony,siphonophores,
+56,medusa,medusa,cnidarians,
+57,nurse,nurse,doliolids,
+58,phorozooids and gonozooids,phorozooids and gonozooids,doliolids,
+59,trophozooid,trophozooid,doliolids,Or gastrozooids
+60,zooid,zooid,pyrosomes,
+61,aggregate,A; agg,salps,
+61,aggregate,agg,salps,
+61,aggregate,Agg,salps,
+61,aggregate,aggregate,salps,
+62,aggregate; solitary,agg and sol,salps,
+62,aggregate; solitary,both,salps,
+63,solitary,A; sol,salps,
+63,solitary,sol,salps,
+63,solitary,solitary,salps,
+64,bract,bract,siphonophores,
+65,eudoxid,eudoxid,siphonophores,
+66,gastrozooid,gastrozooids,siphonophores,
+67,gonophore,gonophore,siphonophores,
+67,gonozooid,gonozooid,siphonophores,
+67,gonozooid,gonozooids,siphonophores,
+68,nectophore,nectophore,siphonophores,
+69,oozooid,oozooid,siphonophores,
+70,pneumatophore,pneumatophore,siphonophores,
+71,polygastric,polygastric,siphonophores,
+72,blastozooid,blastozooid,salps,
+74,calyptopsis,C3,euphausiids,
+74,calyptopsis,C3-F2,euphausiids,
+0,unknown,?,,no stage information
+0,,NA,,no stage information
+0,,20 um,,moved to notes
+0,,25 um,,moved to notes
+0,,anesthetized animal,,moved to notes
+0,,dead animal,,moved to notes
+0,,empty shells,,moved to notes
+0,,empty shells; juveniles,,moved to notes

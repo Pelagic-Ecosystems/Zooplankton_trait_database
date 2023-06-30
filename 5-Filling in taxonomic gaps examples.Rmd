@@ -1,0 +1,393 @@
+---
+title: "Methods for filling in taxonomic gaps"
+author: "Patrick Pata"
+date: "01/12/2022"
+output: html_document
+---
+
+This file extends the level 2 trait data and estimates trait values for taxa with missing trait values. Here, examples for estimating the values of taxonomic gaps for large sections of the database are provided. Alternatively, the R markdown file on the database subset template can be used as a computationally faster way to fill in gaps when there is a specific set of traits and species one is interested in.
+
+The script for generalizing trait values are provided here as an example. First the group-level trait values are generalized from species-level trait values. For numerical trait data, the trait values are averaged per group. For categorical data, the binary versions are averaged. Thus, values can range between 0 and 1 for a group which would represent the likelihood that the group would have a certain categorical trait. The group-level trait generalizations are then used to fill in taxonomic gaps for traits by inheriting the group-level value (prioritizing the genus level value) for species with missing trait data.
+
+Scripts for deriving regression equations for allometric scaling relationships of size vs trait relationships are presented. These scaling models can be calculated with or without accounting for phylogenetic effects. The latter requires a phylogenetic tree that has been pruned to include all the species involved in the regression analysis.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(openxlsx)
+library(lubridate)
+library(lmodel2) # For option of type 2 regressions such as RMA
+library(phylolm) # For linear models accounting for phylogenetic effects
+
+source("toolkit.R")
+```
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+
+infol <- "data_input/Trait_dataset_level2/"
+outfol <- "data_input/Trait_dataset_level3/"
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+
+# Consider all species-level traits and get the phylogenetic tree for these species.
+load("data_input/phylo_tree_trait_level2_20230501.RData")
+
+# Load a table of linear models to test
+reg.models <- read.csv("data_input/allometric_models_to_test_20230212.csv")
+```
+
+
+# Trait value generalization 
+Examples of calculation at the the genus level for species with missing trait values. This script demonstrates a faster computation of the trait value estimation by generalizing at a certain taxonomic level (e.g., genus level). Alternatively, generalization can be done separately for individual traits and taxonomic groups using the getGroupLevelValue() function (not shown here).
+```{r, eval=FALSE}
+# # Prepare the trait dataset
+# Filter the taxonomy table to only include zooplankton groups of interest at species level.
+taxonomy.sp <- taxonomy %>% 
+  rename(aphiaAuthority = valid_authority) %>% 
+  filter(!is.na(majorgroup)) %>% 
+  filter(majorgroup %notin% c("Cubozoan")) %>% 
+  mutate(species = scientificName) %>% 
+  relocate(taxonID, species) %>% 
+  # Assign species names to taxa with no valid names
+  mutate(species = if_else(is.na(species), verbatimScientificName, species)) %>% 
+  distinct(taxonID, .keep_all = TRUE) %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  # Remove some columns added by the taxonomy left_join
+  select(-c(parentNameUsageID, verbatimScientificName)) 
+
+# Identify which traits to generalize. Alternatively, can provide a list of traits to generalize.
+traits.to.generalize <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric","binary")) %>% 
+  filter(taxonID %in% taxonomy.sp$taxonID) %>% 
+  group_by(traitID, traitName) %>% 
+  summarise(ntaxa = n()) %>% 
+  ungroup() %>% 
+  # Set an arbitrary minimum number of species per trait for a generalization
+  filter(ntaxa > 30)
+
+### Generalization and inheritance of traits
+# Generalization is based on literature data. At each level, find children taxa and average.
+
+# The overall data frame for generalization contains numeric and binary data
+trait.literature <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric","binary")) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  mutate(valueRank = taxonRank) 
+
+# Prepare the dataframe that holds the genus-level averages of traits
+trait.genus <- data.frame()
+
+# Loop through each trait and get genus-level average
+for (tnow in unique(trait.literature$traitName)) {
+  trait <- trait.literature %>% 
+    filter(traitName == tnow)
+  
+  # Genus generalization (180)
+  A.rank <- taxonomy %>% 
+    filter(taxonRankID == 180)
+  B.lower <- taxonomy %>% 
+    filter(taxonRankID > 180)
+  
+  for (i in seq(1:nrow(A.rank))){
+    ii <- which(B.lower$genus == A.rank$genus[i] & B.lower$family == A.rank$family[i])
+    jj <- which(trait$taxonID %in% B.lower$taxonID[ii])
+    if (length(jj) > 0){
+      A.rank$traitValue[i] <- mean(trait$traitValue[jj])
+      A.rank$individualCount[i] <- length(jj)
+      A.rank$dispersionSD[i] <- sd(trait$traitValue[jj])
+    } else {
+      A.rank$traitValue[i] <- NA
+      A.rank$individualCount[i] <- 0
+      A.rank$dispersionSD[i] <- NA
+    }
+  }
+  A.genus <- A.rank %>% 
+    mutate(traitName = tnow) %>% 
+    filter(taxonRank == "Genus") %>% 
+    filter(!is.na(traitValue)) %>% 
+    arrange(-individualCount)
+  trait.genus <- trait.genus %>% 
+    bind_rows(A.genus)
+}
+
+trait.genus <- trait.genus %>% 
+  mutate(traitID = 0, traitUnit = 0) %>% # these are placeholders
+  standardizeID(trait.directory) %>% 
+  standardizeUnit(trait.directory) %>% 
+  relocate(traitID, traitName, traitUnit, traitValue, dispersionSD, individualCount)
+
+rm(A.rank, A.genus, B.lower, trait)
+
+### Inheritance to lower ranks
+# Prioritize using the calculated genus level values instead of what is recorded as genus sp. in literature because these are likely for earlier life stages or smaller individuals (esp. for copepods) which were not identified to species level thus, trickier to compare between adults.
+
+# Loop through each trait and apply the generalization to all taxa within a genus
+traits.generalized <- data.frame()
+for (tnow in unique(trait.literature$traitName)) {
+  # Apply inheritance to all species and exclude those with trait info later
+  taxTrait <- taxonomy.sp 
+  
+  # The generalized values at higher levels
+  A.genus <- trait.genus %>% 
+    filter(traitName == tnow) %>% 
+    dplyr::select(genus, traitID, traitName, traitUnit, traitValue, 
+                  dispersionSD, individualCount)
+  
+  # Get generalization at genus level
+  B.genus <- taxTrait %>% 
+    filter(genus %in% A.genus$genus) %>% 
+    left_join(A.genus, by = "genus") %>% 
+    mutate(valueRank = "Genus", basisOfRecord = "generalized")
+  
+  # Add generalized to overall data frame
+  traits.generalized <- traits.generalized %>% 
+    bind_rows(B.genus)
+}
+
+# ## Create Level 3 data based on generalized estimates only
+# # Only assign new traitTaxonIDs to generalized data when merging with the literature dataset
+# traits.lvl3 <- traits.generalized  %>% 
+#     filter(!is.na(traitValue)) %>% 
+#   # if isolating only generalizations without species-level information
+#   mutate(traitTaxon = paste0(traitID,"-",taxonID)) %>% 
+#   filter(traitTaxon %notin% paste0(traits.lvl2$traitID,"-",traits.lvl2$taxonID)) %>% 
+#   mutate(traitValue = as.character(traitValue),
+#          notes = "Trait value generalized from the genus level average.") %>% 
+#   # Add the level 2 data from literature
+#   bind_rows(traits.lvl2) %>% 
+#   dplyr::select(-traitTaxon) %>% 
+#   # get max obs num
+#   mutate(maxObsNum = 0, stageID = 1) %>% # Assume that all are adults for now
+#   # updateIDs() %>% # uncomment if necessary
+#   relocate(colnames(s.format))
+
+```
+
+
+# Calculate allometric scaling relationships
+This shows an example of calculating the scaling relationships using ordinary least squares regression. The lmodel2 used in the getRegressionModel2() function allows other types of regression like reduced major axis.
+```{r, eval=FALSE}
+# Filter the trait dataset for numerical traits
+trait.df <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric")) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  # Assign groups for generating regression models
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group))
+
+reg.results <- data.frame()
+for (i in c(1:nrow(reg.models))){
+  reg.results <- bind_rows(reg.results, 
+                           getRegressionModel2(trait.df, reg.models$group[i],
+                                              reg.models$X[i], reg.models$Y[i],
+                                              model = reg.models$model[i],
+                                              base = reg.models$base[i]))
+}
+
+# # Visualize the relationship between a pair of traits
+# plotAllometric(trait.df, "All", "carbonWeight", "eggWeight")
+
+
+# Output to spreadsheet for inspection and manual model selection
+# openxlsx::write.xlsx(reg.results, file = paste0(
+#   "data_output/regression_results_",ymd(Sys.Date()),".xlsx"))
+
+# Apply the allometric scaling models to missing data 
+
+# Subset of models if selected from the the worksheet manually
+allomModels <- openxlsx::read.xlsx("data_output/regression_results_OLS_2023-04-11_ed.xlsx") %>% 
+  filter(select == "yes") %>% 
+  mutate(base = as.character(base))
+
+# Filter the trait dataset for numerical traits
+trait.df <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric")) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  # only include taxa at species or subspecies level
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  # Assign groups for generating regression models
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group)) %>% 
+  filter(traitName %in% allomModels$Y)
+
+traits.calculated <- s.format
+for (i in c(1:nrow(allomModels))) {
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  calc.now <- calculateFromModel(trait.df, allomModels[i,], trait.directory,
+                                 excludeWithLit = FALSE) %>% 
+    mutate(traitValue = as.character(traitValue))
+  
+  traits.calculated <- traits.calculated %>% 
+    bind_rows(calc.now) %>% 
+    mutate(basisOfRecord = "calculated from regression")
+}
+```
+
+# Allometric scaling accounting for phylogenetic effects 
+```{r, eval=FALSE}
+# Prepare the phylogenetic data table
+# Remove the "ott" in the tree tip label
+zoop_tree$tip.label <-  sub(".*ott","", zoop_tree$tip.label)
+# Rename taxon.count and reorder based on tree.tips/zoop_tree labels
+phylo.table <- tree.tips %>% 
+  dplyr::select(ott_id, color) %>% 
+  left_join(taxon.count, by = "ott_id")
+rm(taxon.count, tree.tips)
+
+# The trait data frame with traits for analysis.
+trait.num.phylo <- traits.lvl2 %>% 
+  filter(traitName %in% c(reg.models$X, reg.models$Y)) %>% 
+  filter(taxonID %in% phylo.table$taxonID) %>% 
+  # only analyze species/subspecies-level
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  # Assign groups for generating regression models
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group))
+
+# Prepare the list of traits to test
+trait.reg <- reg.models %>% 
+  rename(trait1 = X, trait2 = Y) %>% 
+  mutate(base = as.character(base))
+
+# Use the phylolm package. Note that this only does the phylogenetic version of OLS regressions.
+reg.phylo.tests <- data.frame()
+for (i in c(1:nrow(trait.reg))) {
+  trait.num.phylo.group <- trait.num.phylo %>% 
+    filter(grepl(trait.reg$group[i], group))
+  
+  results <-phylolm.test(trait.num.phylo.group, 
+                         c(trait.reg$trait1[i], trait.reg$trait2[i]), 
+                         zoop_tree, base = trait.reg$base[i]) %>% 
+    mutate(test.num = i, 
+           group = trait.reg$group[i])
+  
+  reg.phylo.tests <- reg.phylo.tests %>% 
+    bind_rows(results)
+}
+
+
+# # Prepare table for comparisons. Each dataframe here targets a specific variable from the regression results.
+# min.pairs <- 0
+# # R-squared
+# A1 <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, model.type, adj.r.squared) %>% 
+#   pivot_wider(names_from = model.type, values_from = adj.r.squared) %>% 
+#   rename(r.star = "reg.no.phylo", r.phylo = "reg.phylo") %>% 
+#   mutate(r.change = r.phylo - r.star)
+# # AIC
+# A2 <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, model.type, aic) %>% 
+#   pivot_wider(names_from = model.type, values_from = aic) %>% 
+#   rename(AIC.star = "reg.no.phylo", AIC.phylo = "reg.phylo") %>% 
+#   mutate(AIC.change = AIC.phylo - AIC.star) %>% 
+#   mutate(is.phylo.better.aic = if_else(AIC.phylo < AIC.star, TRUE, FALSE))
+# # loglik
+# A3 <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, model.type, loglik) %>% 
+#   pivot_wider(names_from = model.type, values_from = loglik) %>% 
+#   rename(loglik.star = "reg.no.phylo", loglik.phylo = "reg.phylo") %>% 
+#   mutate(loglik.change = loglik.phylo - loglik.star) %>% 
+#   mutate(is.phylo.better.loglik = if_else(loglik.phylo > loglik.star, TRUE, FALSE))
+# # intercept
+# A4 <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, model.type, intercept) %>% 
+#   pivot_wider(names_from = model.type, values_from = intercept) %>% 
+#   rename(intercept.star = "reg.no.phylo", intercept.phylo = "reg.phylo") %>% 
+#   mutate(intercept.change = intercept.phylo - intercept.star) 
+# # slope
+# A5 <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, model.type, slope) %>% 
+#   pivot_wider(names_from = model.type, values_from = slope) %>% 
+#   rename(slope.star = "reg.no.phylo", slope.phylo = "reg.phylo") %>% 
+#   mutate(slope.change = slope.phylo - slope.star) 
+# B.alpha <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   filter(model.type == "reg.phylo") %>% 
+#   distinct(group, trait1, trait2, alpha)
+# B.sigma <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   filter(model.type == "reg.phylo") %>% 
+#   distinct(group, trait1, trait2, sigma)
+#   
+# reg.table <- reg.phylo.tests %>% filter(N.pairs > min.pairs) %>% 
+#   distinct(group, trait1, trait2, N.pairs, N.pairs, perc.cal,
+#            minX, maxX, base, list, test.num) %>% 
+#   left_join(B.alpha, by = c("group","trait1","trait2")) %>% 
+#   left_join(B.sigma, by = c("group","trait1","trait2")) %>% 
+#   left_join(A1, by = c("group","trait1","trait2")) %>% 
+#   left_join(A2, by = c("group","trait1","trait2")) %>% 
+#   left_join(A3, by = c("group","trait1","trait2")) %>% 
+#   left_join(A4, by = c("group","trait1","trait2")) %>% 
+#   left_join(A5, by = c("group","trait1","trait2")) %>% 
+#   relocate(test.num, group)
+# rm(A1,A2,A3,A4,A5,B.alpha,B.sigma)
+# # Can output this table for manual model selection.
+
+# Apply allometric scaling models
+
+# Reshape allomModels so it will match the model format for calculateFromModel which contains only values for the phylo regression.
+allomModels <- openxlsx::read.xlsx("data_output/phylo_regression_results_2023-04-10_ed.xlsx") %>% 
+  filter(select == "yes") %>% 
+  mutate(base = as.character(base)) %>% 
+  dplyr::select(select, grp = group, X = trait1, Y = trait2, 
+                a = intercept.phylo, b = slope.phylo, 
+                # TODO add CI details if using for figures
+                n = N.pairs, R2 = r.phylo, minX, maxX, base, 
+                r.change, AIC.change, alpha, sigma) %>% 
+  mutate(model = "OLS-phylo")
+
+# Calculate values for species with missing data
+trait.df <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric")) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  # only include taxa at species or subspecies level
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  # Assign groups for generating regression models
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group)) %>% 
+  filter(traitName %in% allomModels$X)
+
+traits.calculated.phylo.reg <- s.format
+for (i in c(1:nrow(allomModels))) {
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  calc.now <- calculateFromModel(trait.df, allomModels[i,], trait.directory,
+                                 excludeWithLit = FALSE) %>% 
+    mutate(traitValue = as.character(traitValue))
+  
+  traits.calculated.phylo.reg <- traits.calculated.phylo.reg %>% 
+    bind_rows(calc.now) %>% 
+    mutate(traitValueSource = "calculated from regression")
+}
+```
+

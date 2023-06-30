@@ -1,0 +1,799 @@
+---
+title: "Compare data imputation methods"
+author: "Patrick Pata"
+date: '2023-01-31'
+output: html_document
+---
+
+This file contains scripts to produce figures 7 and 8 and supplementary figure 3. 
+
+Figure 7 is based on previously derived regression models of the level 2 dataset. Refer to the R markdown file on "filling in taxonomic gaps examples" for scripts to produce the regression models.
+
+Figure 8 and supplementary figure 3 are similarly based on previously calculated trait value estimation tests The process in producing the estimation test data are provided in the scripts below. Note that running the estimation accuracy analysis loop might take days to finish computing. Changing the parameters for the loop and separately saving sections might help with computation times. Figure 8 and supplementary figure 3 are similar but the x-axis variable is different.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(openxlsx)
+library(lubridate)
+library(ggpubr) # for regression line in ggplot
+library(lmodel2)
+library(ggnewscale) # for having multiple color scales in ggplot
+library(cowplot)
+library(phylolm) # for regressions with phylogenetic effects
+library(Rphylopars) # for phylogenetic imputation
+
+source("toolkit.R")
+
+theme_set(theme_bw())
+```
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+# Load Level 1 dataset
+traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-06-28.csv")
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-06-28.csv")
+
+# Consider all species-level traits and get the phylogenetic tree for these species.
+load("data_input/phylo_tree_trait_level2_20230501.RData")
+
+# Load a table of linear models to test
+reg.models <- read.csv("data_input/allometric_models_to_test_20230212.csv")
+```
+
+
+# Figure 7. Allometric Scaling between traits
+```{r, warning=FALSE, fig.width= 5, fig.height=6}
+# Allometric scaling models with regular regression
+reg.models <- openxlsx::read.xlsx("data_output/regression_results_OLS_2023-04-11_ed.xlsx") %>% 
+  filter(select == "yes") %>% 
+  mutate(base = as.character(base))
+
+# Allometric scaling models with phylogenetic regression
+reg.phylo.models <-  openxlsx::read.xlsx("data_output/phylo_regression_results_2023-04-10_ed.xlsx") %>% 
+# Reshape allomModels so it will match the model format for calculateFromModel which contains only values for the phylo regression.
+  filter(select == "yes") %>% 
+  mutate(base = as.character(base)) %>% 
+  dplyr::select(select, grp = group, X = trait1, Y = trait2, 
+                a = intercept.phylo, b = slope.phylo, 
+                # TODO add CI details if using for figures
+                n = N.pairs, R2 = r.phylo, minX, maxX, base, 
+                r.change, AIC.change, alpha, sigma) %>% 
+  mutate(model = "OLS-phylo")
+
+
+var.table <- read.csv("data_input/figure7_variables.csv") 
+traits.lvl1.sub <- data.frame()
+traits.lvl2.sub <- data.frame()
+
+df2 <- traits.lvl2 %>% 
+    # assign groupColor which is copepod: light blue, crustacean: gray, gelatinous:pink
+    mutate(groupColor = if_else(phylum == "Arthropoda", "Crustacean", "Gelatinous"),
+           groupColor = if_else(class == "Copepoda","Copepod", groupColor)) %>% 
+    filter(traitName %in% c(var.table$traitX, var.table$traitY)) %>% 
+    filter(taxonRank %in% c("Species","Subspecies")) %>% 
+    dplyr::select(traitName, taxonID, scientificName, traitValue,
+                  majorgroup, groupColor) %>% 
+    mutate(traitValue = as.numeric(traitValue)) 
+
+for (i in var.table$index){
+  var.list <- var.table[i,]
+  
+  # Level 1 data
+  lvl1.sub <- traits.lvl1 %>%  
+    filter(traitName == var.list$traitY) %>% 
+    filter(sizeAssocName == var.list$traitX) %>% 
+    filter(taxonRank %in% c("Species","Subspecies")) %>%
+    mutate(traitValue = as.numeric(traitValue), 
+           sizeAssocValue = as.numeric(sizeAssocValue)) %>% 
+    filter(!is.na(traitValue) & !is.na(sizeAssocValue)) %>% 
+    dplyr::select(taxonID, traitValue, sizeAssocValue, traitName, sizeAssocName) %>% 
+    distinct()
+  traits.lvl1.sub <- bind_rows(traits.lvl1.sub, lvl1.sub) %>% 
+    mutate(subfigure = var.list$subfigure)
+  
+  # Level 2 data
+  df2.x <- df2 %>% 
+    filter(traitName == var.list$traitX) %>% 
+    rename(traitX = traitName, traitXValue = traitValue)
+  df2.y <- df2 %>% 
+    filter(traitName == var.list$traitY) %>% 
+    rename(traitY = traitName, traitYValue = traitValue)
+  lvl2.sub <- inner_join(df2.x, df2.y, by = c("taxonID", "scientificName", 
+                                              "majorgroup", "groupColor")) %>% 
+    mutate(subfigure = var.list$subfigure)
+    
+  traits.lvl2.sub <- bind_rows(traits.lvl2.sub, lvl2.sub)
+}
+
+model.calc <- bind_rows(reg.models, reg.phylo.models) %>% # reg.lit
+  dplyr::select(model, group = grp, X, Y, a, b, base, R2, n, minX, maxX) %>% 
+# if there are no min and max values, set to limits of the entire dataframe
+  mutate(minX = if_else(is.na(minX), min(minX, na.rm = T), minX),
+         maxX = if_else(is.na(maxX), max(maxX, na.rm = T), maxX)) %>% 
+  mutate(base = as.numeric(base))
+
+# loop through each model and calculate values to plot
+df.reg <- data.frame()
+for(i in 1:nrow(model.calc)) {
+  # create a dummy dataframe of trait values based on the limits of the model
+  df.now <- bind_cols(model.calc[i,1:4],
+               trait.x = seq(model.calc$minX[i], model.calc$maxX[i], len = 5)) %>% 
+    mutate(trait.y = conv.allom(trait.x, model.calc$a[i], model.calc$b[i],
+                                base = model.calc$base[i]))
+  df.reg <- df.reg %>% 
+    bind_rows(df.now)
+}
+
+# Individually visualize subplots
+myplots <- vector("list",15)
+
+for(i in c(1:15)){
+  myplots[[i]] <-  ggplot(filter(traits.lvl2.sub, traitX == var.table[i,3] & traitY == var.table[i,4]),
+                          aes(x = traitXValue, y = traitYValue)) +
+    geom_point(data = filter(traits.lvl1.sub, sizeAssocName == var.table[i,3] &
+                               traitName == var.table[i,4]),
+               aes(x = sizeAssocValue, y = traitValue),
+               shape = 4, size = 0.5, color = "gray80") +
+    geom_point(alpha = 0.7, size = 3, aes(color = groupColor)) +
+    scale_color_manual(values = c("lightblue","gray70","pink")) +
+    scale_x_continuous(labels = scaleFUN, trans = "log10") +
+    scale_y_continuous(labels = scaleFUN, trans = "log10") +
+    theme(legend.position = "none") +
+    xlab(var.table$traitX[i]) + ylab(var.table$traitY[i]) +  
+    ggnewscale::new_scale_colour() +
+    geom_line(data = filter(df.reg, X == var.table[i,3] & Y == var.table[i,4]),
+              aes(x = trait.x, y = trait.y, color = group, linetype = model),
+              linewidth = 1, alpha = 0.8) +
+    scale_color_manual(values = c("darkblue","hotpink")) +
+    labs(color = "model group", linetype = "model")
+}
+
+plot_grid(plotlist = myplots, ncol = 3,
+          labels = "AUTO")
+
+ggsave(filename="figures/fig_7_allometric_scaling.png",
+    width=24.75, height=30, units = "cm", dpi = 300)
+
+```
+
+# Trait value estimation tests
+## Create wrapper functions for imputation
+```{r}
+# Wrapper function to run and extract results from rphylopar::phylopar()
+# Senstivity tests using this dataset, for 551 species and 9 traits, the OU model performs much better than BM or EB models.
+traitPhylopar <- function(trait.complete.wmissing, sp.to.predict, phylo_tree) {
+  # Prune the phylo tree for these traits
+  phylo_tree.sub <- phylo_tree %>% 
+    ape::keep.tip(trait.complete.wmissing$species)
+  
+  # 1. Regular species-level imputation with OU model
+  p_OU <- phylopars(trait_data = trait.complete.wmissing, 
+                    tree = phylo_tree.sub, model = "OU")
+  
+  # 2. Extract imputed trait values and variance
+  # The species means and ancestral states
+  imputed.value <- p_OU$anc_recon[1:nrow(trait.complete.wmissing),] %>% 
+    as.data.frame() %>% 
+    rownames_to_column("species") %>% 
+    pivot_longer(cols = -species, names_to = "traitName",
+                 values_to = "traitValueImputed")
+  imputed.variance <- p_OU$anc_var[1:nrow(trait.complete.wmissing),] %>% 
+    as.data.frame() %>% 
+    rownames_to_column("species") %>% 
+    pivot_longer(cols = -species, names_to = "traitName",
+                 values_to = "traitValueVariance")
+  imputed.data <- left_join(imputed.value, imputed.variance, 
+                            by = c("species","traitName")) %>% 
+    filter(traitValueVariance != 0) # note that for non missing trait values, the variance is 0
+  rm(imputed.value, imputed.variance)
+  
+  # Merge the tested missing data to the imputation test data frame
+  # This can include blanks since the trait value can not be imputed if there are no other traits with values to provide correlations.
+  sp.to.predict <- sp.to.predict %>% 
+    left_join(filter(imputed.data, traitName == unique(sp.to.predict$traitName)),
+              by = c("scientificName" = "species", "traitName")) %>% 
+    # 3. Append with model performance metrics and alpha value
+    mutate(alpha = p_OU$model$alpha, AIC = AIC(p_OU), BIC = BIC(p_OU))
+    
+  return(sp.to.predict)
+}
+
+
+# # Wrapper functions that calculates missing trait values for list of species using various imputation methods. Return a dataframe of the estimated trait data
+# 1. Generalization from the genus/family level mean
+# 2. Allometric scaling equation with size (only for traits with clear allometric relationships)
+# 2.1. Model based on all taxa
+# 2.2. Model based on crustacean vs soft-bodied taxa
+# 3. Regression with phylogenetic effects?
+# 4. Rphylopars restricted maximum likelihood with phylogenetic effects
+
+# Modified function for doing generalization using loop instead of function. Do for genus level first, then family level.
+generalizeTraitTidy <- function(sp.list, trait.df) {
+  # Create a dataframe of averages for the genera or families in the list of taxa
+  gen.genus <- sp.list %>% 
+    distinct(genus) %>% 
+    inner_join(select(trait.df, genus, val = traitValue), 
+               by = "genus", multiple = "all") %>% 
+    group_by(genus) %>% 
+    summarise(traitValue = mean(val), individualCount = n(),
+              dispersionSD = sd(val), .groups = "drop") %>% 
+    filter(!is.na(genus))
+  
+  gen.family <- sp.list %>% 
+    distinct(family) %>% 
+    inner_join(select(trait.df, family, val = traitValue), 
+               by = "family", multiple = "all") %>% 
+    group_by(family) %>% 
+    summarise(traitValue = mean(val), individualCount = n(),
+              dispersionSD = sd(val), .groups = "drop") %>% 
+    filter(!is.na(family))
+  # Apply generalization to each level
+  AA <- sp.list %>% 
+    select(taxonID, genus) %>% 
+    inner_join(gen.genus, by = "genus") %>% 
+    select(-genus)
+  BB <- sp.list %>% 
+    filter(taxonID %notin% AA$taxonID) %>% 
+    select(taxonID, family) %>% 
+    inner_join(gen.family, by = "family") %>% 
+    select(-family)
+  # Merge back to the dataframe from generalization
+  sp.list <- sp.list %>% 
+    left_join(bind_rows(AA,BB), by = "taxonID")
+}
+
+traitImputations <- function(sp.to.predict, all.traits, tested.trait,
+                             size.trait = "bodyLengthMax", 
+                             phylo_tree, phylo.table) {
+  # *** 0. Prepare the necessary dataframes ***
+  # Subset the all.traits data frame for the trait of interest and remove values of species in sp.to.predict
+  trait.df <- all.traits %>% 
+    filter(traitName == tested.trait) %>% 
+    filter(catalogNumber %notin% sp.to.predict$catalogNumber)
+  
+  # Isolate size trait for when doing allometric scaling
+  trait.size <- all.traits %>% 
+    filter(traitName == size.trait)
+  
+  # Work with the data frames: trait.df and trait.size, and sp.to.predict
+  sp.to.predict <- sp.to.predict %>% 
+    mutate(est.allom.all.N = NA, est.allom.all.R2 = NA, est.allom.all = NA,
+           est.allom.crust.N = NA, est.allom.crust.R2 = NA, est.allom.crust = NA,
+           est.allom.gelat.N = NA, est.allom.gelat.R2 = NA, est.allom.gelat = NA,
+           est.rphylopars = NA) %>% 
+    # Assign groups for generating regression models
+    mutate(group = "All Gelatinous") %>% 
+    mutate(group = if_else(phylum == "Arthropoda",
+                           "All Crustaceans", group))
+  
+  # Modify the all.traits dataframe by removing the species to predict for the trait of interest only. The phylopar() will impute for all missing data (both true missing and the removed data for error testing)
+  trait.complete.wmissing <- all.traits %>% 
+    # remove the rows based on sp.to.predict catalogNumber
+    filter(catalogNumber %notin% sp.to.predict$catalogNumber) %>% 
+    # convert to wide dataframe and format of rphylopars; rename scientificName to species to match the phylopar dataframe structure
+    select(species = scientificName, traitName, traitValue) %>% 
+    filter(!is.na(species)) %>% 
+    # transform the trait value?
+    mutate(traitValue = log10(traitValue)) %>% 
+    pivot_wider(names_from = traitName, values_from = traitValue, values_fill = NA)
+
+      
+  # *** 1. Derive and apply genus and family level generalization ***
+  # If n = 1, set standard deviation to zero
+  sp.to.predict <- generalizeTraitTidy(sp.list = sp.to.predict, 
+                                       trait.df = trait.df) %>% 
+    rename(est.generalized = traitValue, est.generalized.N = individualCount,
+           est.generalized.sd = dispersionSD) %>% 
+    mutate(est.generalized.sd = if_else(est.generalized.N == 1,
+                                        0, est.generalized.sd))
+  
+  # *** 2. Derive and apply allometric scaling equations ***
+  # Match the size measure with the trait value
+  trait.allom <- bind_rows(trait.df, trait.size) %>% 
+    # Assign groups for generating regression models
+    mutate(group = "All Gelatinous") %>% 
+    mutate(group = if_else(phylum == "Arthropoda",
+                           "All Crustaceans", group))
+  
+  # Derive regular regression models (*NOT PHYLO REGRESSION*)
+  model.all <- getRegressionModel(trait.allom, grp = "All",
+                                  X = size.trait, Y = tested.trait, base = "10")
+  model.crust <- getRegressionModel(trait.allom, grp = "Crustacean",
+                                    X = size.trait, Y = tested.trait, base = "10")
+  model.gelat <- getRegressionModel(trait.allom, grp = "Gelatinous",
+                                    X = size.trait, Y = tested.trait, base = "10")
+  
+  # Apply the allometric scaling equations to the species to predict for
+  sp.to.predict <- sp.to.predict %>% 
+    mutate(est.allom.all.N = model.all$n, est.allom.all.R2 = model.all$R2, 
+           est.allom.crust.N = model.crust$n, est.allom.crust.R2 = model.crust$R2, 
+           est.allom.gelat.N = model.gelat$n, est.allom.gelat.R2 = model.gelat$R2) %>% 
+    # Find size measure needed for the allometric model
+    left_join(select(filter(trait.size, traitName == size.trait),
+                     taxonID, sizeTraitValue = traitValue), by = "taxonID") %>% 
+    # Calculate for all taxa if size is within range of the model
+    mutate(est.allom.all = if_else(sizeTraitValue >= model.all$minX &
+                                     sizeTraitValue <= model.all$maxX,
+                                   conv.allom(sizeTraitValue, model.all$a, model.all$b, 
+                                              base = as.numeric(model.all$base)),
+                                   est.allom.all)) %>% 
+    # Calculate using group-specific models
+    mutate(est.allom.crust = if_else(str_detect(group, "Crustacean") &
+                                       sizeTraitValue >= model.crust$minX &
+                                       sizeTraitValue <= model.crust$maxX,
+                                     conv.allom(sizeTraitValue, model.crust$a, model.crust$b, 
+                                                base = as.numeric(model.crust$base)),
+                                     est.allom.crust)) %>% 
+    mutate(est.allom.gelat = if_else(str_detect(group, "Gelatinous") &
+                                       sizeTraitValue >= model.gelat$minX &
+                                       sizeTraitValue <= model.gelat$maxX,
+                                     conv.allom(sizeTraitValue, model.gelat$a, model.crust$b, 
+                                                base = as.numeric(model.gelat$base)),
+                                     est.allom.gelat))
+  
+  # *** 3. Use phylogenetic regression equation ***
+  # Calculate phylo regression models
+  model.all <- phylolm.test(filter(trait.allom, grepl("All",group)) , 
+                            trait.list = c(size.trait, tested.trait),
+                            phylo.tree = phylo_tree, base = "10") %>% 
+    filter(model.type == "reg.phylo") %>% 
+    rename(a = intercept, b = slope)
+  model.crust <- phylolm.test(filter(trait.allom, grepl("Crustacean",group)) , 
+                              trait.list = c(size.trait, tested.trait),
+                              phylo.tree = phylo_tree, base = "10") %>% 
+    filter(model.type == "reg.phylo") %>% 
+    rename(a = intercept, b = slope)
+  model.gelat <- phylolm.test(filter(trait.allom, grepl("Gelatinous",group)) , 
+                              trait.list = c(size.trait, tested.trait),
+                              phylo.tree = phylo_tree, base = "10") %>% 
+    filter(model.type == "reg.phylo") %>% 
+    rename(a = intercept, b = slope)
+  
+  # Apply phylo regressions
+    sp.to.predict <- sp.to.predict %>% 
+    mutate(est.allom.all.N.phylo = model.all$N.pairs, 
+           est.allom.all.R2.phylo = model.all$adj.r.squared, 
+           est.allom.crust.N.phylo = model.crust$N.pairs, 
+           est.allom.crust.R2.phylo = model.crust$adj.r.squared, 
+           est.allom.gelat.N.phylo = model.gelat$N.pairs, 
+           est.allom.gelat.R2.phylo = model.gelat$adj.r.squared) %>% 
+    # Calculate for all taxa if size is within range of the model
+    mutate(est.allom.all.phylo = if_else(sizeTraitValue >= model.all$minX &
+                                     sizeTraitValue <= model.all$maxX,
+                                   conv.allom(sizeTraitValue, model.all$a, model.all$b, 
+                                              base = as.numeric(model.all$base)),
+                                   est.allom.all)) %>% 
+    # Calculate using group-specific models
+    mutate(est.allom.crust.phylo = if_else(str_detect(group, "Crustacean") &
+                                       sizeTraitValue >= model.crust$minX &
+                                       sizeTraitValue <= model.crust$maxX,
+                                     conv.allom(sizeTraitValue, model.crust$a, model.crust$b, 
+                                                base = as.numeric(model.crust$base)),
+                                     est.allom.crust)) %>% 
+    mutate(est.allom.gelat.phylo = if_else(str_detect(group, "Gelatinous") &
+                                       sizeTraitValue >= model.gelat$minX &
+                                       sizeTraitValue <= model.gelat$maxX,
+                                     conv.allom(sizeTraitValue, model.gelat$a, model.gelat$b, 
+                                                base = as.numeric(model.gelat$base)),
+                                     est.allom.gelat))
+  
+  # *** 4. Use Rphylopars ***
+  
+# For phylo_par imputation
+  phylo_tree2 <- phylo_tree
+  phylo_tree2$tip.label <- phylo.table$scientificName #$taxonID
+
+  sp.to.predict <- traitPhylopar(trait.complete.wmissing, sp.to.predict, phylo_tree2) %>% 
+    # If transfroming the value above, back transform the imputed traitvalue
+    mutate(traitValueImputed = 10^traitValueImputed)
+  # TODO: back transform variance?
+  
+  return(sp.to.predict)
+}
+```
+
+## Big loop of estimation accuracy analysis
+This does 100 iterations of trait removal from 5% to 70% species removed in 5% intervals. The phylopar analysis will only have body length and the weight trait that matches the allometric scaling equation. Further increasing the number of traits or including all traits when doing the phylopar analysis not only slows down the computation time but also results in less accurate estimates, likely because of overfitting.
+```{r, warning=FALSE, eval=FALSE}
+# Prepare phylo tree and make sure tree tip names match the scientific names
+phylo.table <- tree.tips %>% 
+  dplyr::select(ott_id, color) %>% 
+  left_join(taxon.count, by = "ott_id")
+# For phylo regression
+zoop_tree$tip.label <-  sub(".*ott","", zoop_tree$tip.label)
+
+# # For phylo_par imputation
+# zoop_tree$tip.label <- phylo.table$scientificName #$taxonID
+
+
+# List of traits to do the removal experiment with
+test.list <- c("dryWeight","wetWeight","carbonWeight",
+               "nitrogenTotal","phosphorusTotal",
+               "respirationRate_15C","excretionRateN_15C",
+               "excretionRateP_15C","clearanceRate_15C","eggWeight")
+
+# The size variable to use for regressions
+test.list.size <- c("bodyLengthMax","dryWeight","dryWeight",
+                    "dryWeight","dryWeight",
+                    "carbonWeight","dryWeight",
+                    "dryWeight","carbonWeight","carbonWeight")
+
+# Prepare the trait subset dataframe for testing
+traits.lvl2.test <- traits.lvl2 %>% 
+  filter(traitName %in% test.list) %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  # only include species in phylogenetic tree
+  filter(scientificName %in% phylo.table$scientificName)
+# Include body length information for species with other trait data, this can be useful in the rphylopar imputation step
+traits.lvl2.test <- traits.lvl2.test %>% 
+  bind_rows(filter(traits.lvl2, traitName == "bodyLengthMax",
+                          taxonID %in% traits.lvl2.test$taxonID)) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  filter(!is.na(scientificName))
+
+
+# Create loop for % removed and traits to predict, add replicates
+# tic("Imputation test loop runtime: ")
+res.impute <- data.frame()
+set.seed(888)
+for (frac.remove in c(0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7) ) {
+  for (ii in c(1:1)) { 
+    print(paste0("Analyzing ",frac.remove," of trait ",test.list[ii],"."))
+    for (rep in seq(100)) {
+      trait.complete <- traits.lvl2.test %>% 
+        filter(traitName %in% test.list[ii])
+
+      n.remove <- round(nrow(trait.complete) * frac.remove)
+      remove.rows <- sample(1:nrow(trait.complete), n.remove)
+      
+      sp.to.predict <- trait.complete[remove.rows,] %>% 
+        select(catalogNumber, traitID, taxonID, scientificName, traitName,
+               phylum, class, order, family, genus, majorgroup,
+               recordedTraitValue = traitValue) %>% 
+        mutate(Nrecorded = nrow(trait.complete),
+               fracRemoved = frac.remove,
+               replicate = rep)
+      
+      # Subset of all data for phylopar imputation and allometric equation
+      traits.lvl2.test.subset <- traits.lvl2.test %>% 
+        filter(traitName %in% c(test.list[ii], test.list.size[ii],
+                                "bodyLengthMax"))
+      
+      # Run the trait imputations wrapper function
+      sp.to.predict <- traitImputations(sp.to.predict = sp.to.predict, 
+                                        all.traits = traits.lvl2.test.subset, 
+                                        tested.trait = test.list[ii],
+                                        size.trait = test.list.size[ii],
+                                        phylo_tree = zoop_tree,
+                                        phylo.table = phylo.table)
+    
+      res.impute <- bind_rows(res.impute, sp.to.predict)
+      
+    }
+    
+    # temp file to delete 
+    # save(res.impute, file = "data_output/imputation_test_rep100_temp.RData")
+    # rm(trait.complete, sp.to.predict, traits.lvl2.test.subset)
+  }
+}
+# toc()
+
+```
+
+# Figure 8. Comparison of trait value estimation methods. 
+```{r}
+# 0. Load the results from the previously calculated estimation analysis
+load("data_output/estimation_tests_100_reps_20230413.RData")
+# Rename some columns to match standardized names
+res.impute <- res.impute %>% 
+  rename(catalogNumber = traitTaxonID)
+
+# 1. Analysis for crustaceans
+# Create separate dataframes of the N, R2, and estimated values and merge these together
+df.est.N <- res.impute %>% 
+  filter(phylum == "Arthropoda") %>% 
+  group_by(traitName, Nrecorded, fracRemoved, replicate) %>% 
+  mutate(est.generalized.N = mean(est.generalized.N, na.rm = TRUE)) %>% 
+  # For generalized, calculate the average SE of each generalized species (not  comparable to regression model R2 though)
+  mutate(est.generalized.SE = mean(est.generalized.sd / sqrt(est.generalized.N), 
+                                   na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+           est.generalized.N, est.generalized.SE,
+           est.allom.all.N, est.allom.crust.N, est.allom.gelat.N) %>% 
+  # TODO add from phylo reg
+  pivot_longer(cols = c(est.generalized.N, est.allom.all.N, 
+                        est.allom.crust.N, est.allom.gelat.N),
+               names_to = "method", values_to = "estimate.N") %>% 
+  mutate(method = str_replace(method, ".N",""),
+         est.generalized.SE = if_else(method == "est.generalized",
+                                      est.generalized.SE, NA))
+
+# Dataframe for est.*.R2
+df.est.R2 <- res.impute %>% 
+  filter(phylum == "Arthropoda") %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+            est.allom.all.R2, est.allom.crust.R2, est.allom.gelat.R2,
+            est.allom.all.R2.phylo, est.allom.crust.R2.phylo, 
+           est.allom.gelat.R2.phylo) %>% 
+  pivot_longer(cols = c( est.allom.all.R2, 
+                        est.allom.crust.R2, est.allom.gelat.R2,
+                        est.allom.all.R2.phylo, est.allom.crust.R2.phylo, 
+           est.allom.gelat.R2.phylo),
+               names_to = "method", values_to = "estimate.R2") %>% 
+  mutate(method = str_replace(method, ".R2","")) 
+
+# Create dataframes to compare between regressions, and to evaluate the metrics related to phylopar
+df.est.OU <- res.impute %>%
+  filter(phylum == "Arthropoda") %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+           alpha, AIC, BIC)
+
+# Dataframe for estimated value
+traitValue.comparison <- res.impute %>% 
+  filter(phylum == "Arthropoda") %>% 
+  select(-c(catalogNumber, traitID,
+            phylum, class, order, family, genus, majorgroup,
+            group, sizeTraitValue)) %>% 
+  pivot_longer(cols = c("est.generalized","est.allom.all",
+                        "est.allom.crust","est.allom.gelat",
+                        "est.rphylopars", "est.allom.all.phylo",
+                        "est.allom.crust.phylo","est.allom.gelat.phylo",
+                        "traitValueImputed"), 
+               names_to = "method", values_to = "estimatedTraitValue") %>% 
+  filter(!is.na(estimatedTraitValue)) %>% 
+  filter(!is.infinite(estimatedTraitValue)) %>% 
+  mutate(valueError = recordedTraitValue - estimatedTraitValue) %>% 
+  group_by(traitName, Nrecorded, fracRemoved, replicate, method) %>% 
+  summarise(N = n(),
+            RMSE = sqrt(mean(valueError^2)),
+            mean.abs.error = mean(abs(valueError)),
+            median.abs.error = median(abs(valueError)),
+            R2 = summary(lm(recordedTraitValue ~ estimatedTraitValue))$adj.r.squared,
+            intercept = (lm(recordedTraitValue ~ estimatedTraitValue))$coefficients[1],
+            slope = (lm(recordedTraitValue ~ estimatedTraitValue))$coefficients[2],
+            .groups = "drop")
+
+traitValue.comparison <- traitValue.comparison %>% 
+  mutate(method = factor(method, 
+                         levels = c("traitValueImputed", "est.generalized",
+                                    "est.allom.all","est.allom.all.phylo",
+                                    "est.allom.crust","est.allom.crust.phylo",
+                                    "est.allom.gelat","est.allom.gelat.phylo"))) %>%  
+  mutate(method = recode(method,
+                         "traitValueImputed" = "imputed",
+                         "est.generalized" = "generalized",
+                         "est.allom.all" = "OLS all species",
+                         "est.allom.all.phylo" = "phylo-OLS all species",
+                         "est.allom.crust" = "OLS crustaceans",
+                         "est.allom.crust.phylo" = "phylo-OLS crustaceans",
+                         "est.allom.gelat" = "OLS non-crustaceans",
+                         "est.allom.gelat.phylo" = "phylo-OLS non-crustaceans")) %>% 
+  mutate(traitName = factor(traitName, 
+                            levels = c("dryWeight","wetWeight","carbonWeight",
+               "eggWeight","nitrogenTotal","phosphorusTotal",
+               "excretionRateN_15C", "excretionRateP_15C",
+               "respirationRate_15C", "clearanceRate_15C")))
+
+
+## Plot results of traitValue.comparison - Crustaceans
+
+g1 <- ggplot(traitValue.comparison,
+       aes(x = fracRemoved, y = RMSE,
+               color = method, linetype = method)) +
+  # geom_point(size = 0.2) +
+  geom_smooth(se = FALSE) +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(breaks = c(0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7),
+                     labels = c(5,10,20,30,40,50,60,70)) +
+  scale_color_manual(name = "Estimation method",
+    values = c("gray30","seagreen3","gold2","gold2",
+                              "skyblue","skyblue")) +
+  scale_linetype_manual(name = "Estimation method",
+                     values = c("solid","solid","solid","twodash",
+                                "solid","twodash")) +             
+  facet_wrap(~traitName, scales = "free_y", ncol = 2) +
+  xlab("Percentage of species removed") +
+  theme(legend.position = "bottom") +
+  ggtitle("A. Crustacean species")
+# g1
+
+
+# 2. Analysis for non-crustaceans
+df.est.N <- res.impute %>% 
+  # filter(phylum == "Arthropoda") %>% 
+  filter(phylum != "Arthropoda") %>% 
+  group_by(traitName, Nrecorded, fracRemoved, replicate) %>% 
+  mutate(est.generalized.N = mean(est.generalized.N, na.rm = TRUE)) %>% 
+  # For generalized, calculate the average SE of each generalized species (not  comparable to regression model R2 though)
+  mutate(est.generalized.SE = mean(est.generalized.sd / sqrt(est.generalized.N), 
+                                   na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+           est.generalized.N, est.generalized.SE,
+           est.allom.all.N, est.allom.crust.N, est.allom.gelat.N) %>% 
+  # TODO add from phylo reg
+  pivot_longer(cols = c(est.generalized.N, est.allom.all.N, 
+                        est.allom.crust.N, est.allom.gelat.N),
+               names_to = "method", values_to = "estimate.N") %>% 
+  mutate(method = str_replace(method, ".N",""),
+         est.generalized.SE = if_else(method == "est.generalized",
+                                      est.generalized.SE, NA))
+
+# Dataframe for est.*.R2
+df.est.R2 <- res.impute %>% 
+  # filter(phylum == "Arthropoda") %>% 
+  filter(phylum != "Arthropoda") %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+            est.allom.all.R2, est.allom.crust.R2, est.allom.gelat.R2,
+            est.allom.all.R2.phylo, est.allom.crust.R2.phylo, 
+           est.allom.gelat.R2.phylo) %>% 
+  pivot_longer(cols = c( est.allom.all.R2, 
+                        est.allom.crust.R2, est.allom.gelat.R2,
+                        est.allom.all.R2.phylo, est.allom.crust.R2.phylo, 
+           est.allom.gelat.R2.phylo),
+               names_to = "method", values_to = "estimate.R2") %>% 
+  mutate(method = str_replace(method, ".R2","")) 
+
+# Create dataframes to compare between regressions, and to evaluate the metrics related to phylopar
+df.est.OU <- res.impute %>% 
+  # filter(phylum == "Arthropoda") %>% 
+  filter(phylum != "Arthropoda") %>% 
+  distinct(traitName, Nrecorded, fracRemoved, replicate,
+           alpha, AIC, BIC)
+
+# Dataframe for estimated value
+traitValue.comparison.2 <- res.impute %>% 
+  # filter(phylum == "Arthropoda") %>% 
+  filter(phylum != "Arthropoda") %>% 
+  select(-c(catalogNumber, traitID,
+            phylum, class, order, family, genus, majorgroup,
+            group, sizeTraitValue)) %>% 
+  pivot_longer(cols = c("est.generalized","est.allom.all",
+                        "est.allom.crust","est.allom.gelat",
+                        "est.rphylopars", "est.allom.all.phylo",
+                        "est.allom.crust.phylo","est.allom.gelat.phylo",
+                        "traitValueImputed"), 
+               names_to = "method", values_to = "estimatedTraitValue") %>% 
+  filter(!is.na(estimatedTraitValue)) %>% 
+  filter(!is.infinite(estimatedTraitValue)) %>% 
+  mutate(valueError = recordedTraitValue - estimatedTraitValue) %>% 
+  group_by(traitName, Nrecorded, fracRemoved, replicate, method) %>% 
+  summarise(N = n(),
+            RMSE = sqrt(mean(valueError^2)),
+            mean.abs.error = mean(abs(valueError)),
+            median.abs.error = median(abs(valueError)),
+            R2 = summary(lm(recordedTraitValue ~ estimatedTraitValue))$adj.r.squared,
+            intercept = (lm(recordedTraitValue ~ estimatedTraitValue))$coefficients[1],
+            slope = (lm(recordedTraitValue ~ estimatedTraitValue))$coefficients[2],
+            .groups = "drop")
+
+traitValue.comparison.2 <- traitValue.comparison.2 %>% 
+  mutate(method = factor(method, 
+                         levels = c("traitValueImputed", "est.generalized",
+                                    "est.allom.all","est.allom.all.phylo",
+                                    "est.allom.crust","est.allom.crust.phylo",
+                                    "est.allom.gelat","est.allom.gelat.phylo"))) %>%  
+  mutate(method = recode(method,
+                         "traitValueImputed" = "imputed",
+                         "est.generalized" = "generalized",
+                         "est.allom.all" = "OLS all species",
+                         "est.allom.all.phylo" = "phylo-OLS all species",
+                         "est.allom.crust" = "OLS crustaceans",
+                         "est.allom.crust.phylo" = "phylo-OLS crustaceans",
+                         "est.allom.gelat" = "OLS non-crustaceans",
+                         "est.allom.gelat.phylo" = "phylo-OLS non-crustaceans")) %>% 
+  mutate(traitName = factor(traitName, 
+                            levels = c("dryWeight","wetWeight","carbonWeight",
+               "eggWeight","nitrogenTotal","phosphorusTotal",
+               "excretionRateN_15C", "excretionRateP_15C",
+               "respirationRate_15C", "clearanceRate_15C")))
+
+
+
+## Plot results of traitValue.comparison - Crustaceans
+
+g2 <- ggplot(traitValue.comparison.2,
+       aes(x = fracRemoved, y = RMSE,
+               color = method, linetype = method)) +
+  # geom_point(size = 0.2) +
+  geom_smooth(se = FALSE) +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(breaks = c(0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7),
+                     labels = c(5,10,20,30,40,50,60,70)) +
+  scale_color_manual(name = "Estimation method",
+    # values = c("gray30","seagreen3","gold2","gold2",
+    #                           "skyblue","skyblue")) +
+    values = c("gray30","seagreen3","gold2","gold2",
+                              "pink","pink")) +
+  scale_linetype_manual(name = "Estimation method",
+                     values = c("solid","solid","solid","twodash",
+                                "solid","twodash")) +             
+  facet_wrap(~traitName, scales = "free_y", ncol = 2) +
+  xlab("Percentage of species removed") +
+  theme(legend.position = "bottom") +
+  ggtitle("B. Non-crustacean species")
+# g2
+
+
+# 3. Merge both figures into one
+fig <- plot_grid(g1, g2, nrow = 1)
+fig
+
+ggsave("figures/fig_8_comparison_estimation_percent_removed.png",
+       width = 21, height = 23, units = "cm", dpi = 600)
+#TODO: manually anotate legend
+```
+
+# Supp Fig 3. Comparison of trait value estimation methods against number of species removed.
+```{r}
+# Plot results of traitValue.comparison - Crustaceans
+g3 <- ggplot(traitValue.comparison,
+       aes(x = N, y = RMSE,
+               color = method, linetype = method)) +
+  # geom_point(size = 0.2) +
+  geom_smooth(se = FALSE) +
+  scale_y_continuous(trans = "log10") +
+  scale_color_manual(name = "Estimation method",
+    values = c("gray30","seagreen3","gold2","gold2",
+                              "skyblue","skyblue")) +
+  scale_linetype_manual(name = "Estimation method",
+                     values = c("solid","solid","solid","twodash",
+                                "solid","twodash")) +             
+  facet_wrap(~traitName, scales = "free", ncol = 2) +
+  xlab("Number of species removed") +
+  theme(legend.position = "bottom") +
+  ggtitle("A. Crustacean species")
+g3
+
+
+# Plot results of traitValue.comparison - Non-crustaceans
+g4 <- ggplot(traitValue.comparison.2,
+       aes(x = N, y = RMSE,
+               color = method, linetype = method)) +
+  # geom_point(size = 0.2) +
+  geom_smooth(se = FALSE) +
+  scale_y_continuous(trans = "log10") +
+  scale_color_manual(name = "Estimation method",
+    # values = c("gray30","seagreen3","gold2","gold2",
+    #                           "skyblue","skyblue")) +
+    values = c("gray30","seagreen3","gold2","gold2",
+                              "pink","pink")) +
+  scale_linetype_manual(name = "Estimation method",
+                     values = c("solid","solid","solid","twodash",
+                                "solid","twodash")) +             
+  facet_wrap(~traitName, scales = "free", ncol = 2) +
+  xlab("Number of species removed") +
+  theme(legend.position = "bottom") +
+  ggtitle("B. Non-crustacean species")
+g4
+
+
+fig <- plot_grid(g3, g4, nrow = 1)
+fig
+ggsave("figures/supp_fig_3_comparison_estimation_nspecies_removed.png",
+       width = 21, height = 23, units = "cm", dpi = 600)
+# TODO: manually anotate legend
+```
+

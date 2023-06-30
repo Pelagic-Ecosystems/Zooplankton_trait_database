@@ -1,0 +1,559 @@
+---
+title: "phyR and Cramer's V analysis"
+author: "Patrick Pata"
+date: '2023-01-17'
+output: html_document
+---
+
+
+This file provides the scripts to calculte the phylogenetic correlation between numerical traits and the Cramer's V analysis between categorical traits. Figure 6. Association between traits. is then generated.
+
+The script for calculing the phylogenetic correlations are given but are not evaluated by default since this may take a bit of time. To generate the figure, the previously calculated correlations are loaded.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(lubridate)
+library(phyr)
+library(rcompanion) # For Craymer's V
+library(cowplot)
+
+source("toolkit.R")
+source("toolkit_analysis.R")
+```
+
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+
+infol <- "data_input/Trait_dataset_level2/"
+outfol <- "data_input/Trait_dataset_level2/"
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+
+# Consider all species-level traits and get the phylogenetic tree for these species.
+load("data_input/phylo_tree_trait_level2_20230501.RData")
+```
+
+# Numerical trait correlation with phylogenetic effects
+## Prepare the numeric trait dataset
+Subset the database to only include values at the species level and apply necessary data transformations.
+```{r, fig.height=10, fig.width=10}
+trait.num <- traits.lvl2 %>% 
+  filter(valueType == "numeric") %>% 
+  # only analyze species/subspecies-level
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  mutate(traitValue = as.numeric(traitValue))
+
+# Select which traits for correlation
+trait.num.summary <- trait.num %>% 
+  group_by(traitName) %>% 
+  summarise(Nspecies = n()) %>% 
+  # remove traits with <= 30 species
+  filter(Nspecies > 30) %>% 
+  arrange(-Nspecies)
+
+# Filter the subset data to only traits which we have a good number of species to do correlations.
+trait.num <- trait.num %>% 
+  filter(traitName %in% trait.num.summary$traitName)
+
+sort(unique(trait.num$traitName))
+
+
+# Check data distributions and identify which need transformation
+
+# Only energyDensityVolume does not need transformation. Log10 transformation results in normal distributions for 14 of the 45 traits, but still good to keep log10 transformation for the other traits anyway. 
+# Percent composition traits would be better transformed with logit for regressions.
+# Measures of size, rates, and ratios are okay for log10 transformation
+trans.list <- trait.num %>% 
+  distinct(traitName) %>% 
+  mutate(transformation = "log10") %>% 
+  mutate(transformation = if_else(traitName %in% c("energyDensityVolume",
+                                                   "energyDensityWW",
+                                                   "ingestionRate_WSC_15C"),
+                                  "none",transformation),
+         transformation = if_else(grepl("PDW|PWW|PAFDW",traitName),
+                                  "logit",transformation))
+
+# Loop through all variables and test for normality, additionally calculate the same if log transformed. (p-value < 0.05 is not normal distribution). Kolmogorov-Smirnov test is supposedly more reliable for high sample sizes but it does not handle ties in the data.
+normal.test <- data.frame(traitName = character(), transformation = character(),
+                          N = numeric(), SW = numeric(), SW.trans = numeric())
+for(i in 1:nrow(trans.list)) {
+  A <- filter(trait.num, traitName == trans.list[i,]$traitName)$traitValue
+  normal.test[i,]$traitName <- trans.list[i,]$traitName
+  normal.test[i,]$transformation = trans.list[i,]$transformation
+  normal.test[i,]$N <- length(A)
+  # Shapiro-Wilk test (at high sample size ~>50 this test becomes unreliable)
+  normal.test[i,]$SW <- as.numeric(shapiro.test(A)$p.value)
+  if (trans.list[i,]$transformation == "logit") { 
+    normal.test[i,]$SW.trans <- as.numeric(shapiro.test(logitTransform(A))$p.value)
+  } else {
+    normal.test[i,]$SW.trans <- as.numeric(shapiro.test(log10(A))$p.value)
+  }
+}
+
+normal.test <- normal.test %>% 
+  mutate(isNorm.SW = if_else(SW >= 0.05, TRUE, FALSE),
+         isNorm.SW.log = if_else(SW.trans >= 0.05, TRUE, FALSE),
+         improvedSW = if_else(SW.trans > SW, TRUE, FALSE)) %>% 
+  arrange(improvedSW)
+
+for.trans <- normal.test %>% 
+  filter(isNorm.SW == FALSE & improvedSW == TRUE) %>% 
+  arrange(-SW.trans)
+not.trans <- normal.test %>% 
+  filter(isNorm.SW == TRUE | improvedSW == FALSE) %>% 
+  arrange(-SW.trans)
+
+# Finalize transformations for each trait
+trans.list <- trans.list %>% 
+  mutate(transformation = if_else(traitName %in% not.trans$traitName,
+                                  "none", transformation))
+
+# # Plots to visualize data transformation
+# # Plot histogram distributions
+# ggplot(data = trait.num, aes(x = traitValue)) +
+#   geom_histogram() + 
+#   facet_wrap(~traitName, nrow = 9, scales = "free")
+# 
+# # Q-Q plot of all untransformed data
+# ggplot(data = trait.num, aes(sample = traitValue)) +
+#    stat_qq() + stat_qq_line() +
+#   facet_wrap(~traitName, nrow = 9, scales = "free")
+#   
+# # qqplot for traits to not transform
+# ggplot(data = filter(trait.num, traitName %in% not.trans$traitName), 
+#        aes(sample = traitValue)) +
+#    stat_qq() + stat_qq_line() +
+#   facet_wrap(~traitName, nrow = 2, scales = "free") +
+#   ggtitle("Untransformed data")
+#   
+# # qqplot for transformed and logit
+# ggplot(data = filter(trait.num, traitName %in% 
+#                        filter(for.trans, transformation == "logit")$traitName), 
+#        aes(sample = logitTransform(traitValue))) +
+#    stat_qq() + stat_qq_line() +
+#   facet_wrap(~traitName, nrow = 2, scales = "free") +
+#   ggtitle("logit transformed data")
+# 
+# # qqplot for transformed and log10
+# ggplot(data = filter(trait.num, traitName %in% 
+#                        filter(for.trans, transformation == "log10")$traitName), 
+#        aes(sample = log10(traitValue))) +
+#    stat_qq() + stat_qq_line() +
+#   facet_wrap(~traitName, nrow = 5, scales = "free") +
+#   ggtitle("log10 transformed data")
+
+
+
+# Prepare the phylogenetic data frame from correlation. Make sure to load the phylo tree from the previous script file, and confirm if it has sufficient coverage for this analysis.
+
+# This will remove the "ott" in the tree tip label.
+zoop_tree$tip.label <-  sub(".*ott","", zoop_tree$tip.label)
+
+# Rename taxon.count and reorder based on tree.tips/zoop_tree labels
+phylo.table <- tree.tips %>% 
+  dplyr::select(ott_id, color) %>% 
+  left_join(taxon.count, by = "ott_id")
+rm(taxon.count, tree.tips)
+
+# Subset the trait data frame with traits for analysis.
+trait.num.phylo <- trait.num %>% 
+  filter(taxonID %in% phylo.table$taxonID) %>% 
+  
+# Apply transformations to the data
+  left_join(trans.list, by = "traitName")
+# Log 10 transformation
+ii <- which(trait.num.phylo$transformation == "log10")
+trait.num.phylo[ii,]$traitValue = log10(trait.num.phylo[ii,]$traitValue)
+# Logit transformation
+ii <- which(trait.num.phylo$transformation == "logit")
+trait.num.phylo[ii,]$traitValue = logitTransform(trait.num.phylo[ii,]$traitValue)
+
+```
+
+
+## Calculate correlations with phylogenetic effect
+```{r, warning = FALSE, eval=FALSE}
+# Identify and order which traits to correlate
+trait.size <- c("bodyLengthMax","carbonWeight","dryWeight","wetWeight")
+trait.water <- c("waterPWW","dryWeightPWW","carbonPWW")
+trait.comp <- c("carbonPDW","ashTotal","ashPDW","afdwPDW",
+                "nitrogenTotal","nitrogenPDW", "phosphorusTotal","phosphorusPDW",
+                "carbohydratePDW","lipidPDW","lipidPWW",
+                "proteinPDW","proteinPWW",
+                "ratioCN","ratioCP","ratioNP","ratioProteinLipid",
+                "energyContent","energyDensityDW",
+                "energyDensityWW","energyDensityVolume")
+trait.rate <- c("respirationRate_15C", "respirationRate_WSC_15C",
+                "respirationRate_WSDW_15C","respirationRate_WSWW_15C",
+                "excretionRateN_15C","excretionRateN_WSDW_15C",
+                "excretionRateP_15C","excretionRateP_WSDW_15C",
+                "clearanceRate_15C","clearanceRate_WSC_15C",
+                "ingestionRate_15C","ingestionRate_WSC_15C",
+                "growthRate_15C","growthRate_WSC_15C")
+trait.repro <- c("developmentDuration",
+                 "eggDiameter","eggWeight","clutchSize","fecundity")
+trait.list <- c(trait.size, trait.water, trait.comp, trait.rate, trait.repro)
+
+# Check if any traits are missing
+traits.lvl2 %>% filter(valueType == "numeric") %>%  distinct(traitName) %>% 
+  filter(traitName %notin% trait.list)
+
+# Prepare a list of pairs of traits to correlate
+trait.cor <- data.frame(trait1 = character(), trait2 = character())
+for (i in c(1:(length(trait.list)-1))) {
+  for (j in c(i:length(trait.list))) {
+    trait.cor <- trait.cor %>% 
+      bind_rows(data.frame(trait1 = trait.list[i],
+                           trait2 = trait.list[j]))
+  }
+}
+trait.cor <- trait.cor %>% 
+  filter(trait1 != trait2)
+
+# Loop through correlations and add test.num (~600 tests ~30 mins)
+cor.phylo.tests <- data.frame()
+for (i in c(1:nrow(trait.cor))){ #
+  results <- corphylo.tests(trait.num.phylo, 
+                            c(trait.cor$trait1[i], trait.cor$trait2[i]), 
+                            zoop_tree,
+                            logtransX = FALSE, logtransY = FALSE)
+  if (is.data.frame(results)) {
+    results <- results %>%  mutate(test.num = i)
+    
+    cor.phylo.tests <- cor.phylo.tests %>% 
+      bind_rows(results)
+  }
+}
+
+# # Export results
+# save(cor.phylo.tests, file = "data_output/corphylo_20230410_traitmatrix.RData")
+```
+
+## Organize results of correlation tests
+On average, the with phylo effects model results in a stronger correlation and ranks better as a model compared to a no phylo effects model (both with no ME).
+```{r}
+# Load the results of the chunk above
+load("data_output/corphylo_20230410_traitmatrix.RData")
+
+# Prepare a summary table from the cor phylo test results
+B1 <- cor.phylo.tests %>% 
+  distinct(analysis, model.type, cor.phylo) %>% 
+  pivot_wider(names_from = model.type, values_from = cor.phylo) %>% 
+  rename(r.star = "no.phylo.no.me", r.phylo = "phylo.no.me") %>% 
+  # calculate change r
+  mutate(r.change = r.phylo - r.star)
+  # mutate(r.abs.change = abs(r.phylo) - abs(r.star)) # not a good measure for r~0
+B2 <- cor.phylo.tests %>% 
+  distinct(analysis, model.type, AIC) %>% 
+  pivot_wider(names_from = model.type, values_from = AIC) %>% 
+  rename(AIC.star = "no.phylo.no.me", AIC.phylo = "phylo.no.me") %>% 
+  # calculate change in AIC
+  mutate(AIC.change = AIC.phylo - AIC.star) %>%  # more negative, better
+  mutate(is.phylo.better = if_else(AIC.phylo < AIC.star, TRUE, FALSE))
+B <- cor.phylo.tests %>% 
+  distinct(test.num, analysis, trait1, trait2, N.pairs, perc.cal) %>% 
+  left_join(B1, by = "analysis") %>% 
+  left_join(B2, by = "analysis") %>% 
+  relocate(test.num)
+
+C <- cor.phylo.tests %>% 
+  filter(model.type == "phylo.no.me") %>% 
+  mutate(trait.coef = rep(c("trait1","trait2"), times = cc))
+C1 <- C %>% 
+  distinct(analysis, trait.coef, d) %>% 
+  mutate(d = as.numeric(d)) %>% 
+  pivot_wider(names_from = trait.coef, values_from = d) %>% 
+  rename(d.trait1 = trait1, d.trait2 = trait2)
+C2 <- C %>% 
+  distinct(analysis, trait.coef, B) %>% 
+  mutate(B = as.numeric(B)) %>% 
+  pivot_wider(names_from = trait.coef, values_from = B) %>% 
+  rename(B.trait1 = trait1, B.trait2 = trait2)
+C3 <- C %>% 
+  distinct(analysis, trait.coef, pval) %>% 
+  mutate(pval = as.numeric(pval)) %>% 
+  pivot_wider(names_from = trait.coef, values_from = pval) %>% 
+  rename(pval.trait1 = trait1, pval.trait2 = trait2)
+
+cor.table <- B %>% 
+  left_join(C1, by = "analysis") %>% 
+  left_join(C2, by = "analysis") %>% 
+  left_join(C3, by = "analysis") %>% 
+  left_join(distinct(cor.phylo.tests, analysis, list), by = "analysis")
+rm(B1, B2, B, cc, C, C1, C2, C3)
+
+# Exclude correlations with <10 N.pairs (~5% of max N.pairs)
+cor.table <- cor.table %>% 
+  filter(N.pairs > 10) 
+```
+
+##  Plot correlation matrix figure 
+The colors represent the correlation coefficient, the size represents sample size, and points are marked by a black circle to indicate statistical significance.
+```{r, fig.height=5, fig.width=5}
+cor.table.2 <- cor.table %>% 
+  bind_rows(dplyr::select(cor.table, trait2 = trait1, trait1 = trait2, everything())) %>% 
+   mutate(trait1 = factor(trait1, levels = trait.list),
+         trait2 = factor(trait2, levels = trait.list)) %>% 
+  mutate(trait1.num = as.numeric(trait1),
+         trait2.num = as.numeric(trait2)) %>% 
+  # retain only one side of the matrix
+  arrange(trait1, trait2) %>% 
+  group_by(analysis) %>% 
+  filter(row_number() == 1) %>% 
+  ungroup() %>% 
+# How many correlation coefficients >0.50 and N.pairs > 100
+  mutate(r.mag = if_else(abs(r.phylo) > 0.5 & N.pairs >= 0,
+         "s","w")) %>% 
+  mutate(N.species = N.pairs)
+  
+# Boxes to highlight parts of the correlation matrix
+green.box <- data.frame(x=c(0.5,4.5,4.5,0.5), y=c(0.5,0.5,47.5,47.5))
+yellow.box <- data.frame(x = c(4.5,7.5,7.5,4.5,   8.5,11.5,11.5,8.5, 
+                               11.5,13.5,13.5,11.5, 13.5,15.5,15.5,13.5,
+                               15.5,20.5,20.5,15.5,  20.5,23.5,23.5,20.5,
+                               23.5,28.5,28.5,23.5,  28.5,32.5,32.5,28.5,
+                               32.5,36.5,36.5,32.5,  36.5,40.5,40.5,36.5,
+                               40.5,43.5,43.5,40.5,  43.5,47.5,47.5,43.5),
+                         y = c(4.5,4.5,7.5,7.5,   8.5,8.5,11.5,11.5,
+                               11.5,11.5,13.5,13.5,  13.5,13.5,15.5,15.5,
+                               15.5,15.5,20.5,20.5,  20.5,20.5,23.5,23.5,
+                               23.5,23.5,28.5,28.5,  28.5,28.5,32.5,32.5,
+                               32.5,32.5,36.5,36.5,  36.5,36.5,40.5,40.5,
+                               40.5,40.5,43.5,43.5,  43.5,43.5,47.5,47.5),
+                         label = c(1,1,1,1, 2,2,2,2, 3,3,3,3, 4,4,4,4,
+                                   5,5,5,5,  6,6,6,6, 7,7,7,7,  8,8,8,8,
+                                   9,9,9,9,  10,10,10,10,  11,11,11,11,
+                                   12,12,12,12))
+box.labels <- data.frame(x = c(0.5,4.5,8.5,11.5,13.5,15.5,20.5,23.5,28.5,32.5,36.5,40.5,43.5),
+                         y = c(0.5,4.5,8.5,11.5,13.5,15.5,20.5,23.5,28.5,32.5,36.5,40.5,43.5),
+                         label = c("Size with other traits", "Water content",
+                                   "Ash content", "Nitrogen content", 
+                                   "Phosphorus content", "Proximate composition",
+                                   "Chemical ratio","Energy content",
+                                   "Respiration rate", "Excretion rate",
+                                   "Feeding rate", "Growth", "Eggs"))
+
+
+g1 <- ggplot() +
+  
+  # Polygons to highlight parts of the plot
+  geom_polygon(data=green.box, aes(x=x, y=y), fill = "green", alpha = 0.2) +
+  geom_polygon(data=yellow.box, aes(x=x, y=y, group = label), fill = "yellow", 
+               alpha = 0.3) +
+  geom_text(data=box.labels, aes(x=x, y=y, label = label), 
+            hjust = 0, vjust = 1.1, size = 5) +
+  
+  
+  # Correlation data
+  geom_point(data = cor.table.2, aes(x = trait1.num, y = trait2.num, color = r.mag,
+                        fill = r.phylo, size = N.species),
+             shape = 21,) +
+  geom_point(data = filter(cor.table.2, r.phylo >= 0.5),
+             aes(x = trait1.num, y = trait2.num, fill = r.phylo, size = N.species),
+             shape = 21, color = "black", stroke = 1) +
+  # scale_color_gradient2(low = "blue3", mid = "white", high = "red2", 
+  #                      limits = c(-1,1), name = "corr coef") +
+  scale_color_manual(values = c("black",NA), guide = "none") +
+  scale_fill_gradient2(low = "blue3", mid = "white", high = "red2", 
+                       limits = c(-1,1), name = "r.phylo") +
+  
+  scale_x_discrete(limits = trait.list) +
+  scale_y_reverse(breaks = 1:length(trait.list), labels = trait.list,
+                  limits = c(length(trait.list)+0.5,0.5), expand = c(0, 0))+
+  scale_size_continuous(breaks = c(10,100,200,250), name = "N") +
+  # scale_y_discrete(limits = (trait.list))  +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1),
+        axis.title = element_blank(),
+        aspect.ratio = 1,
+        legend.position = "bottom",
+        # legend.box = "vertical",
+        # legend.key.height = unit(0.5,"in"),
+        legend.key.width=unit(0.3,"in"),
+        text = element_text(size = 16),
+        panel.grid.minor.y = element_blank(),
+        panel.background = element_rect(fill='white'),
+        plot.background = element_rect(fill='white', color=NA))
+
+g1
+```
+
+# Categorical trait Cramer's V
+## Prepare the data frame
+Because some species can have multiple categories for a categorical trait, it is best to do this analysis with the binary versions. Only 8 traits have binary versions: feeding mode, reproduction mode, trophic group, vertical distribution, dvm, hibernation,and myelination but hibernation only includes positive records.
+```{r}
+# Filter the subset data to only traits which we have a good number of species to do correlations.
+trait.binary <- traits.lvl2 %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(valueType == "binary") %>% 
+  filter(!grepl("HIB.", traitName))
+
+sort(unique(trait.binary$traitName))
+
+FM <- trait.binary %>% 
+  filter(grepl("FM.", traitName)) %>% 
+  mutate(val = str_replace(traitName, "FM.","")) %>% 
+  dplyr::select(taxonID, scientificName, val) %>% 
+  mutate(traitName = "feedingMode")
+FM1 <- FM %>% 
+  filter(val %in% c("cruise","current","active.ambush","passive.ambush",
+                           "particle.feeder"))
+FM2 <- FM %>% 
+  filter(val %in% c("active","passive"))
+
+TG <- trait.binary %>% 
+  filter(grepl("TG.", traitName)) %>% 
+  mutate(val = str_replace(traitName, "TG.","")) %>% 
+  dplyr::select(taxonID, scientificName, val) %>% 
+  mutate(traitName = "trophicGroup")
+
+RM <- trait.binary %>% 
+  filter(grepl("RM.", traitName)) %>% 
+  mutate(val = str_replace(traitName, "RM.","")) %>% 
+  dplyr::select(taxonID, scientificName, val) %>% 
+  mutate(traitName = "reproductionMode")
+
+MYE <- trait.binary %>% 
+  filter(grepl("MYE.", traitName)) %>% 
+  filter(traitValue == 1) %>% 
+  mutate(val = str_replace(traitName, "MYE.","")) %>% 
+  dplyr::select(taxonID, scientificName, val)%>% 
+  mutate(traitName = "myelination")
+
+BIO <- trait.binary %>% 
+  filter(grepl("BIO.", traitName)) %>% 
+  filter(traitValue == 1) %>% 
+  mutate(val = str_replace(traitName, "BIO.","")) %>% 
+  dplyr::select(taxonID, scientificName, val) %>% 
+  mutate(traitName = "bioluminescence")
+
+VD <- traits.lvl2 %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(traitName == "verticalDistribution") %>% 
+  dplyr::select(taxonID, scientificName, traitName, val = traitValue)
+
+DVM <- traits.lvl2 %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(traitName == "dielVerticalMigration") %>% 
+  dplyr::select(taxonID, scientificName, traitName, val = traitValue) %>% 
+  filter(val != "absent; present") %>% # Exclude Euphausia superba which has records for both
+  mutate(val = if_else(grepl("absent",val), "absent", "present")) # only retain present or absent records
+
+# Combine all to a single dataframe
+trait.cat <- bind_rows(FM1, TG, RM, VD, DVM, MYE, BIO)
+```
+
+
+## Loop association test with Cramer's V
+A measure of association between two categorical variables. It is a scaled version of the chi-squared test statistic and lies between 0 and 1. Note that there are no negative values, since statistic is bounded at [0,1], >0.5 is strong association.
+```{r}
+# Loop throguh pairs or rate traits, and calculate v
+trait.list.cat <- c("feedingMode", "trophicGroup", "reproductionMode",
+                "verticalDistribution", "dielVerticalMigration",
+                "bioluminescence", "myelination")
+
+trait.cor <- data.frame(trait1 = character(), trait2 = character())
+for (i in c(1:(length(trait.list.cat)-1))) {
+  for (j in c(i:length(trait.list.cat))) {
+    trait.cor <- trait.cor %>% 
+      bind_rows(data.frame(trait1 = trait.list.cat[i],
+                           trait2 = trait.list.cat[j]))
+  }
+}
+trait.cor <- trait.cor %>% 
+  filter(trait1 != trait2)
+
+v.results <- data.frame()
+for(i in c(1:nrow(trait.cor))) {
+  A <- trait.cat %>% 
+    filter(traitName %in% trait.cor[i,1]) %>% 
+    dplyr::select(taxonID, trait1 = val)
+  B <- trait.cat %>% 
+    filter(traitName %in% trait.cor[i,2]) %>% 
+    dplyr::select(taxonID, trait2 = val)
+  
+  AB <- A %>% 
+    left_join(B, by = "taxonID") %>% 
+    filter(!is.na(trait2))
+  
+  AB.results <- data.frame(test.num = i,
+                           trait1 = trait.cor[i,1],
+                           trait2 = trait.cor[i,2],
+                           N.pairs = nrow(AB),
+                           N.species = length(unique(AB$taxonID)),
+                           V = cramerV(AB$trait1, AB$trait2, 
+                                       bias.correct = TRUE))
+  v.results <- bind_rows(v.results, AB.results)
+}
+```
+
+## Plot correlation matrix
+Most pairs have weak association except for feeding mode and reproduction mode. There is weak association (0.3-0.5) between bioluminescence and myelination, DVM and vertical distribution, and feeding mode and trophic group.
+```{r}
+v.table <- v.results %>% 
+  mutate(trait1 = factor(trait1, levels = trait.list.cat),
+         trait2 = factor(trait2, levels = trait.list.cat))
+
+v.table %>% 
+  filter(abs(V) > 0.3) %>% 
+  nrow()
+
+g2 <- ggplot(v.table, aes(x = trait1, y = trait2,
+                        fill = V, size = N.species)) +
+  geom_point(shape = 21) +
+  geom_point(data = filter(v.table, V >= 0.5),
+             aes(x = trait1, y = trait2), shape = 21, color = "black", stroke = 1) +
+  
+  # scale_fill_distiller(palette = "YlOrRd", limits = c(0,1)) +
+  scale_fill_gradient(low = "white", high = "red2",
+                       limits = c(0,1), name = "V") +
+  scale_size_continuous(breaks = c(100, 250, 500), name = "N") +
+  scale_y_discrete(limits = rev(trait.list.cat)) +
+  # scale_x_discrete(position = "top") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1),
+        axis.title = element_blank(),
+        text = element_text(size = 16),
+        legend.justification = "top",
+        # legend.position = "bottom",
+        # legend.box = "vertical",
+        # legend.key.height = unit(0.25,"in"),
+        # legend.position = c(1.2, 0.75),
+        # legend.box.just = "top",
+        aspect.ratio = 1,
+        # panel.background = element_rect(fill='white'),
+        plot.background = element_rect(fill='white', color = "black")) 
+g2
+```
+
+
+# Figure 6. Association between traits. 
+Inset categorical on numerical trait plot
+```{r, fig.height=5, fig.width=5}
+cowplot::ggdraw() +
+  draw_plot(g1) +
+  draw_plot(g2, x = 0.61, y = .645, width = 0.325, height = 0.4)
+  
+ggsave("figures/fig_6_association_between_traits.png",
+       width = 14, height = 13, units = "in", dpi = 600)
+```

@@ -1,0 +1,324 @@
+﻿traitBucket,traitNum,trait,traitID,traitName,traitUnit,verbatimTraitName,verbatimTraitUnit,valueType
+morphological,1,body length,1,bodyLength,mm,Length.(mm),mm,numeric
+morphological,1,body length,1,bodyLength,mm,Mean,mm,numeric
+morphological,1,body length,1,bodyLength,mm,Body.length,mm,numeric
+morphological,1,body length,1,bodyLength,mm,Mean.body.mength,mm,numeric
+morphological,1,body length,1,bodyLength,mm,size_Mean,mm,numeric
+morphological,1,body length,2,bodyLength_Max,mm,size_Max,mm,numeric
+morphological,1,body length,2,bodyLength_Max,mm,Maximum,mm,numeric
+morphological,1,body length,2,bodyLength_Max,mm,Maximal.length.[A1],mm,numeric
+morphological,1,body length,2,bodyLength_Max,mm,Max.bl,mm,numeric
+morphological,1,body length,2,bodyLength_Max,mm,Mean.max.body.length,mm,numeric
+morphological,1,body length,3,bodyLength_Min,mm,size_Min,mm,numeric
+morphological,1,body length,3,bodyLength_Min,mm,Minimum,mm,numeric
+morphological,1,body length,3,bodyLength_Min,mm,Minimal.length.[A1],mm,numeric
+morphological,1,body length,3,bodyLength_Min,mm,Min.bl,mm,numeric
+morphological,1,body length,191,bodyLengthMax,mm,,,numeric
+morphological,2,dry weight,4,dryWeight,mg,dryWeight_Indiv,mg,numeric
+morphological,2,dry weight,4,dryWeight,mg,Dry.mass,mg,numeric
+morphological,2,dry weight,4,dryWeight,mg,dryWeight_Mean,mg,numeric
+morphological,2,dry weight,4,dryWeight,mg,Dry mass,g,numeric
+morphological,2,dry weight,4,dryWeight,mg,dry.mass.(mg),mg,numeric
+morphological,2,dry weight,5,dryWeight_Max,mg,dryWeight_Max,mg,numeric
+morphological,2,dry weight,5,dryWeight_Max,mg,Max.dm,mg,numeric
+morphological,2,dry weight,6,dryWeight_Min,mg,dryWeight_Min,mg,numeric
+morphological,2,dry weight,6,dryWeight_Min,mg,Min.dm,mg,numeric
+morphological,3,wet weight,7,wetWeight,mg,wetWeight_Indiv,mg,numeric
+morphological,3,wet weight,7,wetWeight,mg,wetWeight_Mean,mg,numeric
+morphological,3,wet weight,7,wetWeight,mg,wet.mass.(mg),mg,numeric
+morphological,3,wet weight,8,wetWeight_Max,mg,wetWeight_Max,mg,numeric
+morphological,3,wet weight,9,wetWeight_Min,mg,wetWeight_Min,mg,numeric
+morphological,4,ash free dry weight,10,afdw_Max,mg,afdw_Max,mg,numeric
+morphological,4,ash free dry weight,11,afdw,mg,afdw_Mean,mg,numeric
+morphological,4,ash free dry weight,12,afdw_Min,mg,afdw_Min,mg,numeric
+morphological,4,ash free dry weight,13,afdwPDW_Max,percent,afdw_pdw_Max,percent,numeric
+morphological,4,ash free dry weight,14,afdwPDW,percent,afdw_pdw_Mean,percent,numeric
+morphological,4,ash free dry weight,15,afdwPDW_Min,percent,afdw_pdw_Min,percent,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,Ctotal_Indiv,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,Ctotal_Mean,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,carbonTotal,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,carbonMass_Mean,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,carbonMass_Indiv,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,Cct.total,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,Adult.weight.(mgC),mgC,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,Biom.C/ind.[ug/#],ug,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,carbonWeight,mg,numeric
+morphological,5,carbon weight,16,carbonWeight,mg,C.(mg),mg,numeric
+morphological,5,carbon weight,17,carbonWeight_Max,mg,carbonMass_Max,mg,numeric
+morphological,5,carbon weight,18,carbonWeight_Min,mg,carbonMass_Min,mg,numeric
+morphological,7,water content,19,waterPWW,percent,water_pww,percent,numeric
+morphological,7,water content,20,dryWeightPWW,percent,dryWeight_pww,percent,numeric
+morphological,7,water content,20,dryWeightPWW,percent,dryWeight_pww_Indiv,percent,numeric
+morphological,7,water content,20,dryWeightPWW,percent,Dry.(%.of.wet)),percent,numeric
+morphological,8,myelination,21,myelination,,myelination,,categorical
+morphological,8,myelination,21,myelination,,Myelination,,categorical
+morphological,8,myelination,164,MYE.absent,,,,binary
+morphological,8,myelination,165,MYE.present,,,,binary
+morphological,9,bioluminescence,22,bioluminescence,,bioluminescence,,categorical
+morphological,9,bioluminescence,166,BIO.absent,,,,binary
+morphological,9,bioluminescence,167,BIO.present,,,,binary
+biochemical composition,10,carbon content,23,carbonPDW,percent,C_pdw_Indiv,percent,numeric
+biochemical composition,10,carbon content,23,carbonPDW,percent,Cct.prop,percent,numeric
+biochemical composition,10,carbon content,23,carbonPDW,percent,C_pdw_Mean,percent,numeric
+biochemical composition,10,carbon content,23,carbonPDW,percent,Body.C,percent,numeric
+biochemical composition,10,carbon content,23,carbonPDW,percent,C.(%.dry),percent,numeric
+biochemical composition,10,carbon content,24,carbonPDW_Max,percent,C_pdw_Max,percent,numeric
+biochemical composition,10,carbon content,24,carbonPDW_Max,percent,Max.Cprop,percent,numeric
+biochemical composition,10,carbon content,25,carbonPDW_Min,percent,C_pdw_Min,percent,numeric
+biochemical composition,10,carbon content,25,carbonPDW_Min,percent,Min.Cprop,percent,numeric
+biochemical composition,10,carbon content,26,carbonPWW,percent,Carbon.mass.(%.wet.mass),%.wet.mass,numeric
+biochemical composition,10,carbon content,26,carbonPWW,percent,C_pww_Mean,percent,numeric
+biochemical composition,10,carbon content,26,carbonPWW,percent,C.(mg/mgWet),mg/mgWet,numeric
+biochemical composition,11,nitrogen content,27,nitrogenTotal,mg,Ntotal_Indiv,mg,numeric
+biochemical composition,11,nitrogen content,27,nitrogenTotal,mg,Nct.total,mg,numeric
+biochemical composition,11,nitrogen content,27,nitrogenTotal,mg,Ntotal_Mean,mg,numeric
+biochemical composition,11,nitrogen content,27,nitrogenTotal,mg,nitrogenTotal,mg,numeric
+biochemical composition,11,nitrogen content,27,nitrogenTotal,mg,N.(mg),mg,numeric
+biochemical composition,11,nitrogen content,28,nitrogenPDW,percent,N_pdw_Indiv,percent,numeric
+biochemical composition,11,nitrogen content,28,nitrogenPDW,percent,Nct.prop,percent,numeric
+biochemical composition,11,nitrogen content,28,nitrogenPDW,percent,N_pdw_Mean,percent,numeric
+biochemical composition,11,nitrogen content,28,nitrogenPDW,percent,Body.N,percent,numeric
+biochemical composition,11,nitrogen content,28,nitrogenPDW,percent,N.(%dry),percent,numeric
+biochemical composition,11,nitrogen content,29,nitrogenPDW_Max,percent,Max.Nprop,percent,numeric
+biochemical composition,11,nitrogen content,30,nitrogenPDW_Min,percent,Min.Nprop,percent,numeric
+biochemical composition,12,phosphorus content,31,phosphorusTotal,mg,Ptotal_Mean,mg,numeric
+biochemical composition,12,phosphorus content,31,phosphorusTotal,mg,Pct.total,mg,numeric
+biochemical composition,12,phosphorus content,31,phosphorusTotal,mg,phosphorusTotal,mg,numeric
+biochemical composition,12,phosphorus content,32,phosphorusPDW_Max,percent,P_pdw_Max,percent,numeric
+biochemical composition,12,phosphorus content,32,phosphorusPDW_Max,percent,Max.Pprop,percent,numeric
+biochemical composition,12,phosphorus content,33,phosphorusPDW,percent,P_pdw_Mean,percent,numeric
+biochemical composition,12,phosphorus content,33,phosphorusPDW,percent,Pct.prop,percent,numeric
+biochemical composition,12,phosphorus content,33,phosphorusPDW,percent,Body.P,percent,numeric
+biochemical composition,12,phosphorus content,34,phosphorusPDW_Min,percent,P_pdw_Min,percent,numeric
+biochemical composition,12,phosphorus content,34,phosphorusPDW_Min,percent,Min.Pprop,percent,numeric
+biochemical composition,13,hydrogen content,35,hydrogenTotal,mg,Htotal_Mean,mg,numeric
+biochemical composition,13,hydrogen content,36,hydrogenPDW,percent,H_pdw_Mean,percent,numeric
+biochemical composition,14,elemental ratio,37,ratioCN_Max,unitless,CNratio_Max,,numeric
+biochemical composition,14,elemental ratio,38,ratioCN,unitless,CNratio_Mean,,numeric
+biochemical composition,14,elemental ratio,38,ratioCN,unitless,Body.CN,,numeric
+biochemical composition,14,elemental ratio,38,ratioCN,unitless,C:N.(by.weight),,numeric
+biochemical composition,14,elemental ratio,39,ratioCN_Min,unitless,CNratio_Min,,numeric
+biochemical composition,14,elemental ratio,40,ratioCP_Max,unitless,CPratio_Max,,numeric
+biochemical composition,14,elemental ratio,41,ratioCP,unitless,CPratio_Mean,,numeric
+biochemical composition,14,elemental ratio,41,ratioCP,unitless,Body.CP,,numeric
+biochemical composition,14,elemental ratio,42,ratioCP_Min,unitless,CPratio_Min,,numeric
+biochemical composition,14,elemental ratio,43,ratioNP,unitless,N.Pct,,numeric
+biochemical composition,14,elemental ratio,43,ratioNP,unitless,NPratio_Mean,,numeric
+biochemical composition,14,elemental ratio,43,ratioNP,unitless,Body.NP,,numeric
+biochemical composition,14,elemental ratio,44,ratioNP_Max,unitless,NPratio_Max,,numeric
+biochemical composition,14,elemental ratio,44,ratioNP_Max,unitless,Max.NP,,numeric
+biochemical composition,14,elemental ratio,45,ratioNP_Min,unitless,NPratio_Min,,numeric
+biochemical composition,14,elemental ratio,45,ratioNP_Min,unitless,Min.NP,,numeric
+biochemical composition,15,ash content,46,ashTotal,mg,ash_Total_Indiv,mg,numeric
+biochemical composition,15,ash content,46,ashTotal,mg,ash.(mg),mg,numeric
+biochemical composition,15,ash content,47,ashPDW,percent,ash_pdw_Mean,percent,numeric
+biochemical composition,15,ash content,47,ashPDW,percent,ash_pdw_Indiv,percent,numeric
+biochemical composition,15,ash content,47,ashPDW,percent,Ash.(%.of.dry),percent,numeric
+biochemical composition,15,ash content,48,ashPDW_Max,percent,ash_pdw_Max,percent,numeric
+biochemical composition,15,ash content,49,ashPDW_Min,percent,ash_pdw_Min,percent,numeric
+biochemical composition,15,ash content,50,ashPWW,percent,ash_pww_Mean,percent,numeric
+biochemical composition,16,lipid content,51,lipidPDW,percent,lipid_pdw_Mean,percent,numeric
+biochemical composition,16,lipid content,51,lipidPDW,percent,Lipid.ct,percent,numeric
+biochemical composition,16,lipid content,52,lipidPDW_Max,percent,lipid_pdw_Max,percent,numeric
+biochemical composition,16,lipid content,52,lipidPDW_Max,percent,Max.lip,percent,numeric
+biochemical composition,16,lipid content,53,lipidPDW_Min,percent,lipid_pdw_Min,percent,numeric
+biochemical composition,16,lipid content,53,lipidPDW_Min,percent,Min.lip,percent,numeric
+biochemical composition,16,lipid content,54,lipidPWW,percent,lipid_pww_Mean,percent,numeric
+biochemical composition,16,lipid content,55,lipidPAFDW,percent,lipid_pafdw_Mean,percent,numeric
+biochemical composition,17,protein content,56,proteinPDW,percent,protein_pdw_Mean,percent,numeric
+biochemical composition,17,protein content,56,proteinPDW,percent,Protein.ct,percent,numeric
+biochemical composition,17,protein content,57,proteinPDW_Max,percent,protein_pdw_Max,percent,numeric
+biochemical composition,17,protein content,57,proteinPDW_Max,percent,Max.prot,percent,numeric
+biochemical composition,17,protein content,58,proteinPDW_Min,percent,protein_pdw_Min,percent,numeric
+biochemical composition,17,protein content,58,proteinPDW_Min,percent,Min.prot,percent,numeric
+biochemical composition,17,protein content,59,proteinPWW,percent,protein_pww_Mean,percent,numeric
+biochemical composition,17,protein content,60,proteinPAFDW,percent,protein_pafdw_Mean,percent,numeric
+biochemical composition,18,carbohydrate content,61,carbohydratePDW,percent,carbohydrate_pdw_Mean,percent,numeric
+biochemical composition,18,carbohydrate content,62,carbohydratePDW_Max,percent,carbohydrate_pdw_Max,percent,numeric
+biochemical composition,18,carbohydrate content,63,carbohydratePDW_Min,percent,carbohydrate_pdw_Min,percent,numeric
+biochemical composition,19,chitin content,64,chitinPDW,percent,chitin_pdw_Mean,percent,numeric
+biochemical composition,19,chitin content,65,chitinPDW_Max,percent,chitin_pdw_Max,percent,numeric
+biochemical composition,19,chitin content,66,chitinPDW_Min,percent,chitin_pdw_Min,percent,numeric
+biochemical composition,20,proximate ratio,67,ratioProteinLipid,unitless,PLratio,,numeric
+biochemical composition,21,energy content,68,energyContent,J,energyContent_j_indiv,J,numeric
+biochemical composition,22,energy density,69,energyDensityDW,J mg DW^-1,energyDensity_caldw,cal g DW-1,numeric
+biochemical composition,22,energy density,69,energyDensityDW,J mg DW^-1,energyDensity_kjdw_Mean,kJ g DW-1,numeric
+biochemical composition,22,energy density,70,energyDensityDW_Max,J mg DW^-1,energyDensity_kjdw_Max,kJ g DW-1,numeric
+biochemical composition,22,energy density,71,energyDensityDW_Min,J mg DW^-1,energyDensity_kjdw_Min,kJ g DW-1,numeric
+biochemical composition,22,energy density,72,energyDensityWW,J mg WW^-1,energyDensity_calww,cal g WW-1,numeric
+biochemical composition,22,energy density,72,energyDensityWW,J mg WW^-1,energyDensity_jww_indiv,J mg WW-1,numeric
+biochemical composition,22,energy density,72,energyDensityWW,J mg WW^-1,energyDensity_calww,kcal g WW-1,numeric
+biochemical composition,22,energy density,73,energyDensityAFDW,J mg AFDW^-1,energyDensity_calafdw,kcal g AFDM-1,numeric
+biochemical composition,22,energy density,74,energyDensityVolume,J m^-3,energyDensity_jm3_indiv,J/ m^3,numeric
+behavioral,23,clearance rate,75,clearanceRate,ml h^-1,clearance,ml h-1,numeric
+behavioral,23,clearance rate,75,clearanceRate,ml h^-1,Fmax,ml/h,numeric
+behavioral,23,clearance rate,76,clearanceRate_Max,ml h^-1,clearance_Max,ml h-1,numeric
+behavioral,23,clearance rate,77,clearanceRate_Min,ml h^-1,clearance_Min,ml h-1,numeric
+behavioral,23,clearance rate,78,clearanceRate_WSC,ml mg C^-1 h^-1,clearance_mg,ml mgC-1 h-1,numeric
+behavioral,23,clearance rate,79,clearanceRate_15C,ml h^-1,CR.[ml/#/h],ml h-1,numeric
+behavioral,23,clearance rate,79,clearanceRate_15C,ml h^-1,Fmax.(15°C),ml/h,numeric
+behavioral,23,clearance rate,80,clearanceRate_WSC_15C,ml mg C^-1 h^-1,CR.C.per.C.biom.[ml/mg/h],ml mg C-1 h-1,numeric
+behavioral,23,clearance rate,80,clearanceRate_WSC_15C,ml mg C^-1 h^-1,Specific.Fmax.(15°C),ml/h/mg C,numeric
+behavioral,24,filtration rate,81,filtrationRate,ml h^-1,filtration,ml h-1,numeric
+behavioral,24,filtration rate,81,filtrationRate,ml h^-1,filtration_Mean,ml h-1,numeric
+behavioral,24,filtration rate,82,filtrationRate_Max,ml h^-1,filtration_Max,ml h-1,numeric
+behavioral,24,filtration rate,83,filtrationRate_Min,ml h^-1,filtration_Min,ml h-1,numeric
+behavioral,24,filtration rate,84,filtrationRate_15C,ml h^-1,,,numeric
+behavioral,24,filtration rate,85,filtrationRate_WSC,ml mg C^-1 h^-1,filtration_mg,ml mgC-1 h-1,numeric
+behavioral,24,filtration rate,86,filtrationRate_WSC_15C,ml mg C^-1 h^-1,,,numeric
+behavioral,25,ingestion rate,87,ingestionRate,ug C h^-1,ingestion,ug C/h,numeric
+behavioral,25,ingestion rate,87,ingestionRate,ug C h^-1,Imax,ug C/h,numeric
+behavioral,25,ingestion rate,88,ingestionRate_Max,ug C h^-1,ingestion_Max,ug C/h,numeric
+behavioral,25,ingestion rate,89,ingestionRate_Min,ug C h^-1,ingestion_Min,ug C/h,numeric
+behavioral,25,ingestion rate,90,ingestionRate_15C,ug C h^-1,Imax.(15°C),ug C/h,numeric
+behavioral,25,ingestion rate,90,ingestionRate_15C,ug C h^-1,IR.C/ind.[ng/#/h],ng h-1,numeric
+behavioral,25,ingestion rate,91,ingestionRate_WSC,ug C mg C^-1 h^-1,,,numeric
+behavioral,25,ingestion rate,92,ingestionRate_WSC_15C,ug C mg C^-1 h^-1,IR.C.per.C.biom.[ug/mg/h],ug mg C-1 h-1,numeric
+behavioral,25,ingestion rate,92,ingestionRate_WSC_15C,ug C mg C^-1 h^-1,Specific.Imax.(15°C),ug C/h/mg C,numeric
+behavioral,25,ingestion rate,93,ingestionRatePC,% mg C h^-1,ingestion_perC,% body C/hr,numeric
+physiological,26,respiration rate,94,respirationRate,ul O2 h^-1,Mean,ul O2 h-1,numeric
+physiological,26,respiration rate,94,respirationRate,ul O2 h^-1,Respiration.rt.ind,ul O2 ind-1 h-1,numeric
+physiological,26,respiration rate,95,respirationRate_Max,ul O2 h^-1,Maximum,ul O2 h-1,numeric
+physiological,26,respiration rate,96,respirationRate_Min,ul O2 h^-1,Minimum,ul O2 h-1,numeric
+physiological,26,respiration rate,97,respirationRate_WSC,ul O2 mg C^-1 h^-1,Mean,ul O2 h-1 mg C-1,numeric
+physiological,26,respiration rate,97,respirationRate_WSC,ul O2 mg C^-1 h^-1,respiration_mgC_Mean,ulO2 mg C-1 h-1,numeric
+physiological,26,respiration rate,97,respirationRate_WSC,ul O2 mg C^-1 h^-1,respiration_mgC_Mean,umol O2 mg C-1 h-1,numeric
+physiological,26,respiration rate,98,respirationRate_WSDW,ul O2 mg DW^-1 h^-1,respiration_mgDM_Mean,ulO2 mg DM-1 h-1,numeric
+physiological,26,respiration rate,98,respirationRate_WSDW,ul O2 mg DW^-1 h^-1,Mean,ul O2 h-1 mg DW-1,numeric
+physiological,26,respiration rate,98,respirationRate_WSDW,ul O2 mg DW^-1 h^-1,Respiration.rt.mg,ul O2 mg DM-1 h-1,numeric
+physiological,26,respiration rate,99,respirationRate_WSDW_Max,ul O2 mg DW^-1 h^-1,Maximum,ul O2 h-1 mg DW-1,numeric
+physiological,26,respiration rate,99,respirationRate_WSDW_Max,ul O2 mg DW^-1 h^-1,Max.resp.mg,ul O2 mg DM-1 h-1,numeric
+physiological,26,respiration rate,100,respirationRate_WSDW_Min,ul O2 mg DW^-1 h^-1,Minimum,ul O2 h-1 mg DW-1,numeric
+physiological,26,respiration rate,100,respirationRate_WSDW_Min,ul O2 mg DW^-1 h^-1,Min.resp.mg,ul O2 mg DM-1 h-1,numeric
+physiological,26,respiration rate,101,respirationRate_WSWW,ul O2 mg WW^-1 h^-1,respiration_mgWM_Mean,ulO2 mg WM-1 h-1,numeric
+physiological,26,respiration rate,102,respirationRate_WSProtein,ul O2 mg protein^-1 h^-1,respiration_mgProtein_Mean,ml O2/mg protein/hr,numeric
+physiological,26,respiration rate,103,respirationRate_15C,ul O2 h^-1,,,numeric
+physiological,26,respiration rate,103,respirationRate_15C,ul O2 h^-1,Resp.O2/ind.[ul/#/h],ul O2 h-1,numeric
+physiological,26,respiration rate,104,respirationRate_WSDW_15C,ul O2 mg DW^-1 h^-1,,,numeric
+physiological,26,respiration rate,104,respirationRate_WSDW_15C,ul O2 mg DW^-1 h^-1,Specific.respiration.at.15.°C,ul O2 h-1 mg DW-1,numeric
+physiological,26,respiration rate,105,respirationRate_WSWW_15C,ul O2 mg WW^-1 h^-1,,,numeric
+physiological,26,respiration rate,106,respirationRate_WSProtein_15C,ul O2 mg protein^-1 h^-1,,,numeric
+physiological,26,respiration rate,107,respirationRate_WSC_15C,ul O2 mg C^-1 h^-1,Specific.respiration.at.15.°C,ul O2 h-1 mg C-1,numeric
+physiological,26,respiration rate,107,respirationRate_WSC_15C,ul O2 mg C^-1 h^-1,Resp.O2/C.biom.[ul/mg/h],ul O2 mg C-1 h-1,numeric
+physiological,27,excretion rate N,108,excretionRateN,ug N-NH4+ h^-1,N.ammonia.ex.rt.nmol.ind,nmol N-NH4+ ind-1 h-1,numeric
+physiological,27,excretion rate N,108,excretionRateN,ug N-NH4+ h^-1,N.ammonia.ex.rt.ug.ind,ug N-NH4+ ind-1 h-1,numeric
+physiological,27,excretion rate N,108,excretionRateN,ug N-NH4+ h^-1,N.excretion.rate..ug.N.ind.h.,µg N ind-1 h-1,numeric
+physiological,27,excretion rate N,109,excretionRateN_Max,ug N-NH4+ h^-1,Max.Nex.rt.nmol.ind,nmol N-NH4+ ind-1 h-1,numeric
+physiological,27,excretion rate N,110,excretionRateN_Min,ug N-NH4+ h^-1,Min.Nex.rt.nmol.ind,nmol N-NH4+ ind-1 h-1,numeric
+physiological,27,excretion rate N,111,excretionRateN_WSDW,ug N-NH4+ mg DW^-1 h^-1,N.ammonia.ex.rt.nmol.dm,nmol N-NH4+ mg DM-1 h-1,numeric
+physiological,27,excretion rate N,111,excretionRateN_WSDW,ug N-NH4+ mg DW^-1 h^-1,N.ammonia.ex.rt.ug.dm,ug N-NH4+ mg DM-1 h-1,numeric
+physiological,27,excretion rate N,112,excretionRateN_WSDW_Max,ug N-NH4+ mg DW^-1 h^-1,Max.Nex.rt.ug.dm,ug N-NH4+ mg DM-1 h-1,numeric
+physiological,27,excretion rate N,113,excretionRateN_WSDW_Min,ug N-NH4+ mg DW^-1 h^-1,Min.Nex.rt.ug.dm,ug N-NH4+ mg DM-1 h-1,numeric
+physiological,27,excretion rate N,114,excretionRateN_WSC,ug N-NH4+ mg C^-1 h^-1,excretion_N_mg_Mean,umol N-NH4+/mg C/hour,numeric
+physiological,27,excretion rate N,115,excretionRateN_15C,ug N-NH4+ h^-1,,,numeric
+physiological,27,excretion rate N,116,excretionRateN_WSDW_15C,ug N-NH4+ mg DW^-1 h^-1,,,numeric
+physiological,28,excretion rate P,117,excretionRateN_WSProtein,ug N-NH4+ mg protein^-1 h^-1,excretion_N_protein_Mean,ug N-NH4+/mg protein/hr,numeric
+physiological,28,excretion rate P,118,excretionRateP,ug P-PO43- h^-1,P.phosphate.ex.rt.nmol.ind,nmol P-PO43- ind-1 h-1,numeric
+physiological,28,excretion rate P,118,excretionRateP,ug P-PO43- h^-1,P.phosphate.ex.rt.ug.ind,ug P-PO43- ind-1 h-1,numeric
+physiological,28,excretion rate P,118,excretionRateP,ug P-PO43- h^-1,P.excretion.rate..ug.P.ind.h.,µg P ind-1 h-1,numeric
+physiological,28,excretion rate P,119,excretionRateP_Max,ug P-PO43- h^-1,Max.Pex.rt.nmol.ind,nmol P-PO43- ind-1 h-1,numeric
+physiological,28,excretion rate P,120,excretionRateP_Min,ug P-PO43- h^-1,Min.Pex.rt.nmol.ind,nmol P-PO43- ind-1 h-1,numeric
+physiological,28,excretion rate P,121,excretionRateP_WSDW,ug P-PO43- mg DW^-1 h^-1,P.phosphate.ex.rt.nmol.dm,nmol P-PO43- mg DM-1 h-1,numeric
+physiological,28,excretion rate P,122,excretionRateP_15C,ug P-PO43- h^-1,,,numeric
+physiological,28,excretion rate P,123,excretionRateP_WSDW_15C,ug P-PO43- mg DW^-1 h^-1,,,numeric
+physiological,29,egestion rate,124,egestionRate,% mg C h^-1,egestion_perC,% body C/hour,numeric
+physiological,29,egestion rate,125,egestionRate_WSC,ug faecal C mg C^-1 h^-1,egestion_mg_Mean,ug faecal C / mg body C / h,numeric
+physiological,29,egestion rate,126,egestionRate_WSC_Max,ug faecal C mg C^-1 h^-1,egestion_mg_Max,ug faecal C / mg body C / h,numeric
+physiological,29,egestion rate,127,egestionRate_WSC_Min,ug faecal C mg C^-1 h^-1,egestion_mg_Min,ug faecal C / mg body C / h,numeric
+physiological,30,growth rate,128,growthRate,mg C h^-1,g.(d-1),mg C d-1,numeric
+physiological,30,growth rate,128,growthRate,mg C h^-1,Growth,mg C/h,numeric
+physiological,30,growth rate,128,growthRate,mg C h^-1,growth_mm,mm/month,numeric
+physiological,30,growth rate,129,growthRate_WSC,mg C mg C^-1 h^-1,"Mass.corrected.growth.rate.(g,.d-1)",mg C mg C-1 d-1,numeric
+physiological,30,growth rate,129,growthRate_WSC,mg C mg C^-1 h^-1,Specific.growth,mg C/h/mg C,numeric
+physiological,30,growth rate,130,growthRate_15C,mg C h^-1,15C.corrected.growth.rate.g.(d-1),mg C d-1,numeric
+physiological,30,growth rate,130,growthRate_15C,mg C h^-1,u.C.per/ind.[mg/#/h],mg C h-1,numeric
+physiological,30,growth rate,130,growthRate_15C,mg C h^-1,Growth.(15°C),mg C/h,numeric
+physiological,30,growth rate,131,growthRate_WSC_15C,mg C mg C^-1 h^-1,u.C.per.C.biom.[mg/mg/h],mg C mg C-1 h-1,numeric
+physiological,30,growth rate,131,growthRate_WSC_15C,mg C mg C^-1 h^-1,Specific.growth.(15°C),mg C/h/mg C,numeric
+physiological,30,growth rate,132,growthRatePLength,% mm h^-1,growth_mm_perc,% mm length/hour,numeric
+physiological,30,growth rate,132,growthRatePLength,% mm h^-1,growth_mm_perc_Mean,% mm length/hour,numeric
+physiological,30,growth rate,133,growthRatePLength_Max,% mm h^-1,growth_mm_perc_Max,% mm length/hour,numeric
+physiological,30,growth rate,134,growthRatePLength_Min,% mm h^-1,growth_mm_perc_Min,% mm length/hour,numeric
+physiological,30,growth rate,135,growthRatePWeight,% mg C h^-1,,% weight C/hour,numeric
+physiological,30,growth rate,136,growthRatePWeight_Max,% mg C h^-1,growth_weightC_Max,% weight C/hour,numeric
+physiological,30,growth rate,137,growthRatePWeight_Min,% mg C h^-1,growth_weightC_Min,% weight C/hour,numeric
+behavioral,31,feeding mode,138,feedingMode,,feedingMode,,categorical
+behavioral,31,feeding mode,138,feedingMode,,Feeding.type,,categorical
+behavioral,31,feeding mode,138,feedingMode,,Feeding mode,,categorical
+behavioral,31,feeding mode,138,feedingMode,,Feeding.strategy,,categorical
+behavioral,31,feeding mode,138,feedingMode,,Feeding.mode,,categorical
+behavioral,31,feeding mode,168,FM.passive,,,,binary
+behavioral,31,feeding mode,169,FM.active,,,,binary
+behavioral,31,feeding mode,170,FM.cruise,,,,binary
+behavioral,31,feeding mode,171,FM.current,,,,binary
+behavioral,31,feeding mode,172,FM.ambush,,,,binary
+behavioral,31,feeding mode,173,FM.active.ambush,,,,binary
+behavioral,31,feeding mode,174,FM.passive.ambush,,,,binary
+behavioral,31,feeding mode,175,FM.particle.feeder,,,,binary
+behavioral,31,feeding mode,176,FM.parasite,,,,binary
+behavioral,31,feeding mode,177,FM.commensal,,,,binary
+behavioral,32,reproduction mode,139,reproductionMode,,reproductionMode,,categorical
+behavioral,32,reproduction mode,139,reproductionMode,,Reproduction.mode,,categorical
+behavioral,32,reproduction mode,139,reproductionMode,,Spawning strategy,,categorical
+behavioral,32,reproduction mode,139,reproductionMode,,Spawning.strategy,,categorical
+behavioral,32,reproduction mode,139,reproductionMode,,Spawning.mode,,categorical
+behavioral,32,reproduction mode,178,RM.broadcasting,,,,binary
+behavioral,32,reproduction mode,179,RM.brooding,,,,binary
+behavioral,32,reproduction mode,180,RM.asexual,,,,binary
+behavioral,33,trophic group,140,trophicGroup,,trophicGroup,,categorical
+behavioral,33,trophic group,140,trophicGroup,,Trophic.group,,categorical
+behavioral,33,trophic group,140,trophicGroup,,Trophic.Regime,,categorical
+behavioral,33,trophic group,181,TG.carnivore,,,,binary
+behavioral,33,trophic group,182,TG.omnivore,,,,binary
+behavioral,33,trophic group,183,TG.herbivore,,,,binary
+behavioral,33,trophic group,184,TG.detritivore,,,,binary
+behavioral,34,vertical distribution,141,verticalDistribution,,verticalDistribution,,categorical
+behavioral,34,vertical distribution,141,verticalDistribution,,Vertical.distribution,,categorical
+behavioral,34,vertical distribution,141,verticalDistribution,,Pelagic.layer,,categorical
+behavioral,35,habitat association,142,habitatAssociation,,habitatAssociation,,categorical
+behavioral,35,habitat association,142,habitatAssociation,,Habitat,,categorical
+behavioral,36,diel vertical migration,143,dielVerticalMigration,,dvm,,categorical
+behavioral,36,diel vertical migration,143,dielVerticalMigration,,DVM,,categorical
+behavioral,36,diel vertical migration,143,dielVerticalMigration,,DVM.behaviour,,categorical
+behavioral,36,diel vertical migration,185,DVM.absent,,,,binary
+behavioral,36,diel vertical migration,186,DVM.present,,,,binary
+behavioral,36,diel vertical migration,187,DVM.reverse,,,,binary
+behavioral,36,diel vertical migration,188,DVM.weak,,,,binary
+behavioral,36,diel vertical migration,189,DVM.strong,,,,binary
+life history,37,hibernation,144,hibernation,,hibernation,,categorical
+life history,37,hibernation,145,hibernationStage,,hibernationStage,,categorical
+life history,37,hibernation,145,hibernationStage,,Hibernation,,categorical
+life history,37,hibernation,145,hibernationStage,,Diapause,,categorical
+life history,37,hibernation,146,restingEggs,,restingEggs,,categorical
+life history,37,hibernation,146,restingEggs,,Resting eggs,,categorical
+life history,37,hibernation,190,HIB.present,,,,binary
+life history,38,clutch size,147,clutchSize,eggs clutch^-1,Mean,,numeric
+life history,38,clutch size,148,clutchSize_Max,eggs clutch^-1,clutchSize_Max,,numeric
+life history,38,clutch size,148,clutchSize_Max,eggs clutch^-1,Maximum,,numeric
+life history,38,clutch size,149,clutchSize_Min,eggs clutch^-1,clutchSize_Min,,numeric
+life history,38,clutch size,149,clutchSize_Min,eggs clutch^-1,Minimum,,numeric
+life history,39,fecundity,150,fecundity,eggs female^-1,Mean,,numeric
+life history,39,fecundity,150,fecundity,eggs female^-1,fecundity_Mean,,numeric
+life history,39,fecundity,151,fecundity_Max,eggs female^-1,fecundity_Max,,numeric
+life history,39,fecundity,151,fecundity_Max,eggs female^-1,Maximum,,numeric
+life history,39,fecundity,152,fecundity_Min,eggs female^-1,fecundity_Min,,numeric
+life history,39,fecundity,152,fecundity_Min,eggs female^-1,Minimum,,numeric
+life history,40,egg size,153,eggWeight,ug,Offspring.weight.(mgC),mgC,numeric
+life history,40,egg size,153,eggWeight,ug,Mean,ug,numeric
+life history,40,egg size,154,eggDiameter,um,Mean,um,numeric
+life history,40,egg size,154,eggDiameter,um,Estimated.outer.diameter,um,numeric
+life history,40,egg size,154,eggDiameter,um,eggSize_Mean,um,numeric
+life history,40,egg size,155,eggDiameter_Max,um,eggSize_Max,um,numeric
+life history,40,egg size,155,eggDiameter_Max,um,Maximum,um,numeric
+life history,40,egg size,156,eggDiameter_Min,um,eggSize_Min,um,numeric
+life history,40,egg size,156,eggDiameter_Min,um,Minimum,um,numeric
+life history,41,development duration,157,developmentDuration,day,Mean,day,numeric
+life history,41,development duration,157,developmentDuration,day,devDuration_Mean,day,numeric
+life history,41,development duration,158,developmentDuration_Max,day,devDuration_Max,day,numeric
+life history,41,development duration,158,developmentDuration_Max,day,Maximum,day,numeric
+life history,41,development duration,159,developmentDuration_Min,day,devDuration_Min,day,numeric
+life history,41,development duration,159,developmentDuration_Min,day,Minimum,day,numeric
+life history,41,development duration,160,developmentRate_15C,day^-1,Development.rate.(15°C),day-1,numeric
+life history,42,life span,161,lifeSpan,day,lifeSpan_Mean,day,numeric
+life history,42,life span,162,lifeSpan_Max,day,lifeSpan_Max,day,numeric
+life history,42,life span,163,lifeSpan_Min,day,lifeSpan_Min,day,numeric

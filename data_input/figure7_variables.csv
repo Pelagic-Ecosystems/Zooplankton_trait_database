@@ -1,0 +1,16 @@
+﻿index,subfigure,traitX,traitY
+1,A,bodyLengthMax,dryWeight
+2,B,bodyLengthMax,wetWeight
+3,C,bodyLengthMax,carbonWeight
+4,D,dryWeight,ashTotal
+5,E,dryWeight,wetWeight
+6,F,dryWeight,carbonWeight
+7,G,carbonWeight,energyContent
+8,H,dryWeight,nitrogenTotal
+9,I,dryWeight,phosphorusTotal
+10,J,carbonWeight,respirationRate_15C
+11,K,dryWeight,excretionRateN_15C
+12,L,dryWeight,excretionRateP_15C
+13,M,carbonWeight,clearanceRate_15C
+14,N,carbonWeight,ingestionRate_15C
+15,O,carbonWeight,eggWeight

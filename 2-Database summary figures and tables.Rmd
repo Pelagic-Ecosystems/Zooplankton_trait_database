@@ -1,0 +1,505 @@
+---
+title: "Finalizing level 2 dataset"
+author: "Patrick Pata"
+date: "01/12/2022"
+output: html_document
+---
+
+This file provides the scripts to produce figures 3 and 5.
+
+This file loads the level 2 trait dataset of species level averages with derived trait values and finalizes and exports the level 2 trait dataset. Rate traits that were not standardized to 15 degrees celsius, i.e., those that do not have an associated temperature value, are excluded. If there are other revisions to the level 2 trait dataset, these could be included here. The numerical, categorical, and binary traits are then merged into a single dataframe for the level 2 trait dataset.
+
+The rest of the file includes codes that summarize the level 2 trait data in tables and figures. The data sources of the traits are catalogued and a summary table of traits and which references they were originally sourced from is created. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(openxlsx)
+library(lubridate)
+library(ggbreak) # cite: 10.3389/fgene.2021.774846
+library(cowplot)
+
+source("toolkit.R")
+
+# theme_set(theme_bw())
+```
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+
+infol <- "data_input/Trait_dataset_level2/"
+outfol <- "data_input/Trait_dataset_level2/"
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+```
+
+
+
+# Figure 3. Summary of level 2 data coverage as the number of species records per trait by major group. 
+Only traits recorded at the species level were enumerated.
+```{r, fig.height=4, fig.width=3}
+
+# Assign colors to major groups
+majorgroup.colors <- data.frame(
+  majorgroup = c("Calanoid","Non-calanoid","Mysid","Amphipod","Decapod","Euphausiid",
+                 "Ostracod","Polychaete","Pteropod",
+                 "Chaetognath","Appendicularian","Thaliacean","Cladoceran",
+                 "Hydromedusae","Siphonophore","Scyphomedusae","Ctenophore"),
+  color = c("blue","navy","slateblue2","cornflowerblue","cyan2","forestgreen",
+            "seagreen3","tan1","green",
+            "darkorchid4","violetred","hotpink3","saddlebrown",
+            "tomato1","goldenrod3","yellow2","red4"))
+            
+# To slightly change the labels for the plot
+majorgroup.colors.ed.labels <-  c("Calanoids","Non-calanoids","Mysids",
+                                  "Amphipods","Decapods","Euphausiids",
+                                  "Ostracods","Polychaetes","Pteropods",
+                                  "Chaetognaths","Appendicularians","Thaliaceans",
+                                  "Cladocerans","Hydromedusae",
+                                  "Siphonophores","Scyphozoans","Ctenophores")
+
+trait.sum <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric","categorical")) %>% 
+  dplyr::select(traitID, traitName, taxonID, scientificName, majorgroup, taxonRank,
+         primaryReference, secondaryReference) %>% 
+  left_join(distinct(trait.directory,
+                     traitBucket, traitNum, trait, traitID),
+            by = "traitID") %>% 
+  # only consider species and subspecies level when presenting results
+  filter(taxonRank %in% c("Species","Subspecies")) 
+
+# Number of species with at least one trait info
+length(unique(trait.sum$taxonID))
+  
+# count number of unique species-trait records (note that this is not traitName thus nitrogenPDW and nitrogenTotal are the same trait:nitrogen content)
+trait.sum <- trait.sum %>% 
+  distinct(traitBucket, traitNum, traitName, majorgroup, taxonID) %>% 
+  group_by(traitBucket, traitNum, traitName, majorgroup) %>% 
+  # Number of species-trait per major group
+  summarise(Nsp.mg = n()) %>% 
+  group_by(traitBucket, traitNum, traitName) %>% 
+  # Number of species per trait
+  mutate(Nspecies = sum(Nsp.mg)) %>% 
+  arrange(traitNum) %>% 
+  ungroup() %>% 
+  # arrange by trait bucket and decreasing total value
+  mutate(majorgroup = factor(majorgroup, levels = majorgroup.colors$majorgroup),
+         traitBucket = factor(traitBucket, 
+                              levels = c("morphological","biochemical composition",
+                                         "physiological","behavioral",
+                                         "life history"))) %>% 
+  mutate(traitName = fct_reorder(traitName, Nspecies))
+
+            
+# Stacked barplot with count at end
+bplot <- ggplot(trait.sum, aes(x = traitName, y = Nsp.mg, 
+                               fill = majorgroup)) +
+  
+  geom_bar(stat = "identity") +
+  # Set axis break
+  scale_y_continuous(breaks = c(0, 250, 500, 750, 1000, 3000),
+                     limits = c(0, 3180)) +
+  scale_y_break(c(1250,2900), expand = FALSE) +
+  # Add number at end of bar
+  geom_text(aes(label = after_stat(y), group = traitName),
+            stat = "summary", fun = sum, hjust = -0.1,
+            size = 5) +
+  scale_fill_manual(values = majorgroup.colors$color,
+                    limits = majorgroup.colors$majorgroup,
+                    labels = majorgroup.colors.ed.labels,
+                    name = "Major group") +
+  coord_flip() +
+  xlab("Trait") + ylab("# Species") +
+  # facets proportioned by number of traits
+  facet_grid(traitBucket ~., scales = "free_y", space = "free", switch = "y")  +
+  theme_bw() +
+  theme(strip.placement = "outside", text = element_text(size = 20),
+        legend.position = c(0.8, 0.5),
+        legend.background = element_rect(fill = "white", colour = "black")) 
+bplot 
+
+ggsave(filename = "figures/fig_3_coverage_barplot_species.png",
+    width = 32, height=37, units = "cm", dpi = 300)
+```
+
+
+## Figure 3 version enumerated by trait group
+```{r, fig.height=3, fig.width=3, eval = FALSE}
+
+# Assign colors to major groups
+majorgroup.colors <- data.frame(
+  majorgroup = c("Calanoid","Non-calanoid","Mysid","Amphipod","Decapod","Euphausiid",
+                 "Ostracod","Polychaete","Pteropod",
+                 "Chaetognath","Appendicularian","Thaliacean","Cladoceran",
+                 "Hydromedusae","Siphonophore","Scyphomedusae","Ctenophore"),
+  color = c("blue","navy","slateblue2","cornflowerblue","cyan2","forestgreen",
+            "seagreen3","tan1","green2",
+            "darkorchid4","violetred","hotpink3","saddlebrown",
+            "tomato1","goldenrod3","yellow2","red4"))
+            
+
+trait.sum <- traits.lvl2 %>% 
+  filter(valueType %in% c("numeric","categorical")) %>% 
+  select(traitID, traitName, taxonID, scientificName, majorgroup, taxonRank,
+         primaryReference, secondaryReference) %>% 
+  left_join(distinct(trait.directory,
+                     traitBucket, traitNum, trait, traitID),
+            by = "traitID") %>% 
+  # only consider species and subspecies level when presenting results
+  filter(taxonRank %in% c("Species","Subspecies")) 
+
+# Number of species with at least one trait info
+length(unique(trait.sum$taxonID))
+  
+# count number of unique species-trait records (note that this is not traitName thus nitrogenPDW and nitrogenTotal are the same trait:nitrogen content)
+trait.sum <- trait.sum %>% 
+  distinct(traitBucket, traitNum, trait, majorgroup, taxonID) %>% 
+  group_by(traitBucket, traitNum, trait, majorgroup) %>% 
+  # Number of species-trait per major group
+  summarise(Nsp.mg = n()) %>% 
+  group_by(traitBucket, traitNum, trait) %>% 
+  # Number of species per trait
+  mutate(Nspecies = sum(Nsp.mg)) %>% 
+  arrange(traitNum) %>% 
+  ungroup() %>% 
+  # arrange by trait bucket and decreasing total value
+  mutate(majorgroup = factor(majorgroup, levels = majorgroup.colors$majorgroup),
+         traitBucket = factor(traitBucket, 
+                              levels = c("morphological","biochemical composition",
+                                         "physiological","behavioral",
+                                         "life history"))) %>% 
+  mutate(trait = fct_reorder(trait, Nspecies))
+
+            
+# Stacked barplot with count at end
+bplot <- ggplot(trait.sum, aes(x = trait, y = Nsp.mg, 
+                               fill = majorgroup)) +
+  geom_bar(stat = "identity") +
+  # Set axis break
+  scale_y_continuous(breaks = c(0, 250, 500, 750, 1000, 3000),
+                     limits = c(0, 3180)) +
+  scale_y_break(c(1250,2980), expand = FALSE) +
+  # Add number at end of bar
+  geom_text(aes(label = after_stat(y), group = trait),
+            stat = "summary", fun = sum, hjust = -0.1,
+            size = 3) +
+  scale_fill_manual(values = majorgroup.colors$color,
+                    limits = majorgroup.colors$majorgroup,
+                    name = "Major group") +
+  coord_flip() +
+  xlab("Trait") + ylab("# Species") +
+  # facets proportioned by number of traits
+  facet_grid(traitBucket ~., scales = "free_y", space = "free", switch = "y") +
+  theme_bw() +
+  theme(strip.placement = "outside") 
+bplot
+```
+
+
+# Figure 5. Distribution of values of eight traits for each of the zooplankton classes.
+```{r, fig.width=3, fig.height=3, eval=TRUE, warning=FALSE}
+scaleFUN.int <- function(x) sprintf("%.0f", x)
+
+# Distribution of Size + nitrogen content and respiration rate
+trait.num <- traits.lvl2 %>% 
+  filter(valueType == "numeric") %>% 
+  mutate(traitValue = as.numeric(traitValue))
+# get mean size per major group to reorder majorgroups
+A <- trait.num %>% 
+  filter(majorgroup %notin% c("Cubozoan")) %>% 
+  filter(traitName == "bodyLengthMax") %>% 
+  group_by(class) %>% 
+  summarise(meanlength = mean(traitValue), sd = sd(traitValue), 
+            median = median(traitValue), n = n()) %>% 
+  arrange(meanlength)
+
+# Filter trait information and assign factors 
+B <- trait.num %>% 
+  filter(majorgroup %notin% c("Cubozoan")) %>% 
+  filter(traitName %in% c("bodyLengthMax", "carbonWeight", "wetWeight",
+                          "nitrogenPDW","respirationRate_WSC_15C")) %>% 
+  mutate(traitName = factor(traitName)) %>% 
+  mutate(traitName = factor(traitName, 
+                            levels = c("bodyLengthMax", "wetWeight",
+                                       "nitrogenPDW","respirationRate_WSC_15C"))) %>%
+  filter(!is.na(class)) %>% 
+  # add sample size
+  group_by(traitName, class) %>% 
+  mutate(Nspecies = n()) %>% 
+  mutate(meanValue = mean(traitValue)) %>% 
+  ungroup() %>% 
+  # Assign blank column and relevel factors
+  bind_rows(data.frame(traitName = "wetWeight", Nspecies = 0,
+                       class = c("Branchiopoda","Appendicularia") )) %>% 
+  bind_rows(data.frame(traitName = "respirationRate_WSC_15C", Nspecies = 0,
+                       class = c("Branchiopoda","Appendicularia",
+                                 "Gastropoda","Sagittoidea","Polychaeta") )) %>% 
+  # Order by length
+  mutate(class = factor(class, levels = A$class))
+  
+
+
+# By cowplot
+j1 <- ggplot(filter(B, traitName == "bodyLengthMax"),
+             aes(x = class, y = traitValue, fill = Nspecies)) +
+  geom_violin() +  #scale="area", width=1.5
+  geom_point(aes(y = meanValue), size =2, color = "black") +
+  scale_y_continuous(trans = "log10", labels = scaleFUN.int) +
+  scale_x_discrete(breaks = A$class) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right", 
+        legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10)) +
+  scale_fill_continuous("N species", type = "viridis", trans = "log10") +
+  ylab("Maximum body length\n(mm)")
+
+
+j2 <- ggplot(filter(B, traitName == "wetWeight"),
+             aes(x = class, y = traitValue, fill = Nspecies)) +
+  geom_violin() +  #scale="area", width=1.5
+  geom_point(aes(y = meanValue), size =2, color = "black") +
+  scale_y_continuous(trans = "log10") +
+  scale_x_discrete(breaks = A$class) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right",
+        legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10)) +
+  scale_fill_continuous("N species", type = "viridis", trans = "log10") +
+  ylab("Wet weight (mg)")
+
+
+j3 <- ggplot(filter(B, traitName == "nitrogenPDW"),
+             aes(x = class, y = traitValue, fill = Nspecies)) +
+  geom_violin() +  #scale="area", width=1.5
+  geom_point(aes(y = meanValue), size =2, color = "black") +
+  scale_y_continuous(trans = "log10", labels = scaleFUN.int) +
+  scale_x_discrete(breaks = A$class) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right",
+        legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10)) +
+  scale_fill_continuous("N species", type = "viridis", trans = "log10") +
+  ylab("Nitrogen content \n(percent dry weight)")
+
+
+j4 <- ggplot(filter(B, traitName == "respirationRate_WSC_15C"),
+             aes(x = class, y = traitValue, fill = Nspecies)) +
+  geom_violin() +
+  geom_point(aes(y = meanValue), size =2, color = "black") +
+  scale_y_continuous(trans = "log10", labels = scaleFUN.int) +
+  scale_x_discrete(breaks = A$class) +
+  theme_bw() +
+  scale_fill_continuous("N species", type = "viridis", trans = "log10") +
+  ylab("Respiration rate \n(ul O2 mg C^-1 h^-1)") + xlab("Class") +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12),
+        legend.position = "right",
+        legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10)) 
+
+
+J <- plot_grid(j1, j2, j3, j4,
+               ncol = 1, align = "v", rel_heights = c(1,1,1,1.6),
+               labels = c("A","B","C","D"))
+
+# Distribution of some common categorical traits
+cat.traits <- traits.lvl2 %>% 
+  filter(majorgroup %notin% c("Cubozoans"), 
+         class %notin% c("Cubozoa")) %>% 
+  # Order arbitrarily by broad phylogeny
+  mutate(class = factor(class, levels = A$class))
+
+# Visualize the number of species associated with a particular categorical trait
+vertical.distribution <- cat.traits %>% 
+  filter(traitName == "verticalDistribution") %>% 
+  group_by(traitValue, class) %>% 
+  summarise(Nspecies = n()) %>% 
+  rename(traitName = traitValue) %>% 
+  mutate(traitName = factor(traitName,
+                             levels = c("epipelagic","epimesopelagic",
+                                        "epibathypelagic","mesopelagic",
+                                        "mesobathypelagic","bathypelagic"))) %>% 
+  ungroup() %>% 
+  mutate(trait = "Vertical Distribution")
+
+repro.mode <- cat.traits %>% 
+  filter(traitName %in% c("RM.broadcasting","RM.brooding","RM.asexual"),
+         traitValue == 1) %>% 
+  # rename trait levels by removing "RM." prefix
+  mutate(traitName = str_replace(traitName, "RM.","")) %>% 
+  group_by(traitName, class) %>% 
+  summarise(Nspecies = n()) %>% 
+  ungroup() %>% 
+  # Assign blank column and relevel factors
+  bind_rows(data.frame(traitName = "brooding", class = "Scyphozoa",
+                       Nspecies = 0)) %>% 
+  mutate(class = factor(class, levels = A$class)) %>% 
+  mutate(trait = "Reproduction Mode")
+
+feeding.mode <- cat.traits %>% 
+  filter(traitName %in% c("FM.passive.ambush","FM.active.ambush","FM.cruise",
+                          "FM.current","FM.particle.feeder"),
+         traitValue == 1) %>% 
+  mutate(traitName = str_replace(traitName, "FM.","")) %>% 
+  group_by(traitName, class) %>% 
+  summarise(Nspecies = n()) %>% 
+  ungroup() %>% 
+  # Assign blank column and relevel factors
+  # bind_rows(data.frame(traitName = "cruise", majorgroup = "Decapod",
+  #                      Nspecies = 0)) %>% 
+  mutate(class = factor(class, levels = A$class),
+         traitName = factor(traitName, 
+                            levels = c("cruise","current","active.ambush",
+                                       "passive.ambush","particle.feeder"))) %>% 
+  mutate(trait = "Feeding Mode")
+  
+trophic.group <- cat.traits %>% 
+  filter(traitName %in% c("TG.omnivore","TG.herbivore",
+                          "TG.carnivore","TG.detritivore"),
+         traitValue == 1) %>% 
+  mutate(traitName = str_replace(traitName, "TG.","")) %>% 
+  group_by(traitName, class) %>% 
+  summarise(Nspecies = n()) %>% 
+  ungroup() %>% 
+  mutate(traitName = factor(traitName, 
+                            levels = c("herbivore","omnivore",
+                                       "carnivore","detritivore"))) %>% 
+  mutate(trait = "Trophic Group") 
+  
+
+h1 <- ggplot(vertical.distribution,
+             aes(x = class, y = Nspecies, fill = traitName)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_y_continuous(labels = scales::percent, position = "left", expand = c(0, 0))  + 
+  xlab("Major group") + ylab("% Records") +
+  scale_x_discrete(breaks = A$class, expand = c(0, 0)) +
+  scale_fill_manual("Vertical Distribution",
+                    values = c("turquoise3", "seagreen4", "darkgreen",
+                              "mediumblue","purple4","gray10")) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right", legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10))
+
+h2 <- ggplot(repro.mode,
+             aes(x = class, y = Nspecies, fill = traitName)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_y_continuous(labels = scales::percent, position = "left", expand = c(0, 0))  + 
+  xlab("Major group") + ylab("% Records") +
+  scale_x_discrete(breaks = A$class, expand = c(0, 0)) +
+  scale_fill_manual("Reproduction Mode",
+    values = c("grey50","lightpink","lightskyblue")) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right", legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10))
+
+h3 <- ggplot(feeding.mode,
+             aes(x = class, y = Nspecies, fill = traitName)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_y_continuous(labels = scales::percent, position = "left", expand = c(0, 0))  + 
+  xlab("Major group") + ylab("% Records") +
+  scale_x_discrete(breaks = A$class, expand = c(0, 0)) +
+  scale_fill_manual("Feeding Mode",
+    values = c("maroon4","hotpink3","khaki3","tan4","steelblue4")) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        legend.position = "right", legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10))
+
+h4 <- ggplot(trophic.group,
+             aes(x = class, y = Nspecies, fill = traitName)) +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_y_continuous(labels = scales::percent, position = "left", expand = c(0, 0))  + 
+  xlab("Class") + ylab("% Records") +
+  scale_fill_manual("Trophic Group",
+    values = c("olivedrab3","darkorange","firebrick3","darkorchid4")) +
+  scale_x_discrete(breaks = A$class, expand = c(0, 0)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12),
+        legend.position = "right", legend.justification = c(0,1),
+        legend.margin=margin(0,0,0,0),
+        legend.box.margin=margin(0,0,0,-10)) 
+
+H <- plot_grid(h1, h2, h3, h4, 
+               ncol = 1, align = "v", rel_heights = c(1,1,1,1.6),
+               labels = c("E","F","G","H"))
+
+
+# Merge summaries into a single figure
+fig <- plot_grid(J, H, nrow = 1, rel_widths = c(1,1.1))
+
+fig
+
+ggsave(filename = "figures/fig_5_trait_distributions.png",
+    width = 24.75, height=30, units = "cm", dpi = 300)
+```
+
+
+
+# Supp Figure 2. Size bias in trait coverage. 
+```{r}
+# Data frame of body lengths
+A.length <- traits.lvl2 %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(valueType %in% c("numeric","categorical")) %>% 
+  filter(traitName == "bodyLengthMax") %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  select(taxonID, scientificName, bodyLength = traitValue)
+
+# Data frame counting number of trait records categorize by "trait" and not trait name
+B.all.traits <- traits.lvl2 %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(valueType %in% c("numeric","categorical"))  %>% 
+  filter(traitName != "bodyLengthMax") %>% 
+  # Add "trait" info by joining with trait directory
+  left_join(select(trait.directory, traitName, trait)) %>%   
+  distinct(taxonID, scientificName, valueType, trait,  phylum, class) %>% 
+  group_by(taxonID, scientificName, valueType, phylum, class) %>% 
+  summarise(Ntraits = n()) %>% 
+  pivot_wider(names_from = valueType, values_from = Ntraits, values_fill = 0)
+
+C2 <- inner_join(B.all.traits, A.length, by = c("taxonID","scientificName"))
+
+ggplot(filter(C2, numeric > 0), 
+       aes(x = bodyLength, y = numeric)) +
+  geom_point(aes(color = phylum), alpha = 0.3) +
+  geom_smooth(aes(color = phylum), method = "lm", se = FALSE) +
+  scale_color_manual(values = c("tan1","blue","darkorchid4","violetred",
+                                      "goldenrod3","red4","green2"),
+  name = "Phylum") +
+  geom_smooth(data = C2, aes(x = bodyLength, y = numeric), 
+              color = "black") +
+  xlab("Body length (mm)") + ylab("Number of numerical traits") +
+  scale_x_continuous(trans = "log10")
+
+ggsave("figures/supp_fig_2_bias_numtraits_size.png",
+       width = 7.5, height = 3, units = "in", dpi = 300)
+```

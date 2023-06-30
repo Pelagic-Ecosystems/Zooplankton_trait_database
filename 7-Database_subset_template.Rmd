@@ -1,0 +1,332 @@
+---
+title: "Template for subsetting the database"
+author: "Patrick Pata"
+date: "06/30/2023"
+output: html_document
+---
+
+This script is a template for extracting a subset of the trait database for the local species pool and a set of traits. This template was made for species-level (level 2) data. Note that this only provides examples for a few traits and the choice of methods to use is user-dependent.
+
+# Load libraries and data
+```{r}
+library(tidyverse)
+library(openxlsx)
+source("toolkit.R")
+
+
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") 
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+# # Load Level 1 dataset
+# traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-06-28.csv")
+
+# Load Level 2 dataset
+traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-06-28.csv")
+
+# Change assocTemperature column class to allow row binds
+traits.lvl2$assocTemperature <- as.character(traits.lvl2$assocTemperature)
+traits.lvl2$verbatimTemperature <- as.character(traits.lvl2$verbatimTemperature)
+```
+
+
+# List selected species and traits
+```{r}
+trait.list <- c("bodyLengthMax","dryWeight","carbonWeight","respirationRate_15C",
+                "respirationRate_WSC_15C","nitrogenTotal","excretionRateN_15C",
+                "trophicGroup","feedingMode")
+
+# Need to know the species name that matches the species names in this database
+species.list <- data.frame(Species = c("Calanus marshallae",
+                                       "Calanus pacificus",
+                                       "Cyphocaris challengeri",
+                                       "Dimophyes arctica",
+                                       "Eucalanus bungii",
+                                       "Eukrohnia hamata",
+                                       "Euphausia pacifica",
+                                       "Neocalanus cristatus",
+                                       "Neocalanus plumchrus",
+                                       "Oikopleura dioica",
+                                       "Oithona similis",
+                                       "Paraeuchaeta elongata",
+                                       "Scina borealis",
+                                       "Tomopteris pacifica",
+                                       "Limacina helicina",
+                                       "Clione limacina",
+                                       "Muggiaea atlantica",
+                                       "Lensia conoidea")) %>% 
+  # Match species list with taxonomy file to get taxonID
+  left_join(taxonomy, by = c("Species" = "verbatimScientificName")) %>% 
+  filter(!is.na(taxonID)) %>% 
+  distinct()
+```
+
+# Subset the species and traits 
+This will return the trait values based on literature or derived using related traits.
+```{r}
+trait.subset <- traits.lvl2 %>% 
+  filter(traitName %in% trait.list) %>% 
+  filter(taxonID %in% species.list$taxonID)
+
+# Evaluate how many species have trait information
+trait.subset %>% 
+  distinct(traitName, taxonID) %>% 
+  group_by(traitName) %>% 
+  summarise(Nrecords = n(), .groups = "drop") %>% 
+  mutate(Perc.sp = Nrecords / nrow(species.list) * 100)
+```
+
+# Fill-in gaps for numerical traits
+Accuracy tests have shown that for traits which follow allometric scaling relationships, estimating trait values using ordinary least squares regressions performs best (smaller errors) compared to generalization or imputation. For other numerical traits and categorical traits, generalization at the genus or family level might be applicable.
+
+For numerical traits known to have allometric scaling relationships, you can either load a previous regression model or calculate one. A model may perform better for a specific taxonomic group compared to a broader list of species. In general, a model of just crustaceans works better compared to all taxa for many traits. The performance of the model is also limited by the sample size of trait values and the taxonomic range used in deriving the model. The taxonomic level of the regression should be decided.
+
+## Size traits
+Allometric models need measures of size as predictors so these need to be calculated first.
+```{r}
+# Body length is the most common trait and can be used to estimate weight. If there are missing bodyLength values, these would need to be generalized or imputed.
+missing.length <- species.list %>% 
+  filter(taxonID %notin% filter(trait.subset, traitName == "bodyLengthMax")$taxonID)
+
+# Empty dataframe for generalized trait with the same format as the database.
+traits.generalized <- s.format
+# Select trait and level of generalization
+trait <- "bodyLengthMax" 
+gen.level <- "genus"
+for (taxon in missing.length$scientificName){
+  gen <- getGroupLevelValue(taxon, trait, gen.level = gen.level, 
+                            trait.df = traits.lvl2, 
+                            taxonomy.df = taxonomy)
+  if(is.data.frame(gen)) {
+    gen <- gen %>%  
+      mutate(traitValue = as.character(traitValue))
+    traits.generalized <- traits.generalized %>% 
+      bind_rows(gen)
+  }
+}
+# Add generalized to trait dataset
+traits.lvl2.ed <- bind_rows(trait.subset, traits.generalized)
+
+# A. If using previously calculated models.
+# Load and curate a file of regression results. These are OLS regressions calculated from the level 2 database. The column "select" was manually added during model selection and can be revised in a spreadsheet to make model curation easier. 
+allomModels <- openxlsx::read.xlsx("data_output/regression_results_OLS_2023-04-11_ed.xlsx") %>% 
+  mutate(base = as.character(base)) %>% 
+  filter(Y %in% trait.list) %>% 
+  filter(select == "yes") %>% 
+  # calculate carbon weight from dry weight, not length
+  filter(!(X == "bodyLengthMax" & Y == "carbonWeight"))
+
+# Assign groups for generating regression models
+traits.lvl2.ed <- traits.lvl2.ed %>% 
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group))
+
+# Calculate weights first since these are used in estimating traits
+## i. Dry weight
+allomModels.dryWeight <- allomModels %>% 
+  filter(Y  == "dryWeight")
+
+traits.calculated <- s.format
+for (i in c(1:nrow(allomModels.dryWeight))) {
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  calc.now <- calculateFromModel(traits.lvl2.ed, allomModels.dryWeight[i,], trait.directory,
+                                 excludeWithLit = TRUE, 
+                                 applyToGeneralized = TRUE,
+                                 excludeCalculated = FALSE) %>% 
+    mutate(traitValue = as.character(traitValue))
+  
+  traits.calculated <- traits.calculated %>% 
+    bind_rows(calc.now) %>% 
+    mutate(basisOfRecord = "calculated from regression")
+}
+# Filter only species of interest
+traits.calculated <- traits.calculated %>% 
+  filter(taxonID %in% species.list$taxonID)
+# Update the overall working trait dataset
+traits.lvl2.ed <- bind_rows(traits.lvl2.ed, traits.calculated)
+
+## ii. Carbon weight
+# Calculate weights first since these are used in estimating traits
+allomModels.carbonWeight <- allomModels %>% 
+  filter(Y  == "carbonWeight")
+
+traits.calculated <- s.format
+for (i in c(1:nrow(allomModels.carbonWeight))) {
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  calc.now <- calculateFromModel(traits.lvl2.ed, allomModels.carbonWeight[i,], trait.directory,
+                                 excludeWithLit = TRUE, 
+                                 applyToGeneralized = TRUE,
+                                 excludeCalculated = FALSE) %>% 
+    mutate(traitValue = as.character(traitValue))
+  
+  traits.calculated <- traits.calculated %>% 
+    bind_rows(calc.now) %>% 
+    mutate(basisOfRecord = "calculated from regression")
+}
+# Filter only species of interest
+traits.calculated <- traits.calculated %>% 
+  filter(taxonID %in% species.list$taxonID)
+# Update the overall working trait dataset
+traits.lvl2.ed <- bind_rows(traits.lvl2.ed, traits.calculated)
+
+# If there are still missing weight trait values, generalize these?
+
+# Empty dataframe for generalized trait with the same format as the database.
+traits.generalized <- s.format
+## i. Dry weight
+missing.weight <- species.list %>% 
+  filter(taxonID %notin% filter(traits.lvl2.ed, traitName == "dryWeight")$taxonID)
+# Select trait and level of generalization
+trait <- "dryWeight" 
+gen.level <- "genus"
+for (taxon in missing.weight$scientificName){
+  gen <- getGroupLevelValue(taxon, trait, gen.level = gen.level, 
+                            trait.df = traits.lvl2, 
+                            taxonomy.df = taxonomy)
+  if(is.data.frame(gen)) {
+    gen <- gen %>%  
+      mutate(traitValue = as.character(traitValue))
+    traits.generalized <- traits.generalized %>% 
+      bind_rows(gen)
+  }
+}
+
+## ii. Carbon weight
+missing.weight <- species.list %>% 
+  filter(taxonID %notin% filter(traits.lvl2.ed, traitName == "carbonWeight")$taxonID)
+# Select trait and level of generalization
+trait <- "carbonWeight" 
+gen.level <- "genus"
+for (taxon in missing.weight$scientificName){
+  gen <- getGroupLevelValue(taxon, trait, gen.level = gen.level, 
+                            trait.df = traits.lvl2, 
+                            taxonomy.df = taxonomy)
+  if(is.data.frame(gen)) {
+    gen <- gen %>%  
+      mutate(traitValue = as.character(traitValue))
+    traits.generalized <- traits.generalized %>% 
+      bind_rows(gen)
+  }
+}
+# Add generalized to trait dataset
+traits.lvl2.ed <- bind_rows(traits.lvl2, traits.generalized) %>% 
+  mutate(group = "All Gelatinous") %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class == "Copepoda",
+         "All Crustaceans Copepods", group)) %>% 
+  mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
+         "All Crustaceans", group))
+```
+
+## Other numerical traits
+```{r}
+allomModels <- allomModels %>% 
+  filter(Y %notin% c("carbonWeight","dryWeight"))
+
+traits.calculated <- s.format
+for (i in c(1:nrow(allomModels))) {
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  calc.now <- calculateFromModel(traits.lvl2.ed, allomModels[i,], trait.directory,
+                                 excludeWithLit = TRUE, 
+                                 applyToGeneralized = TRUE,
+                                 excludeCalculated = FALSE) %>% 
+    mutate(traitValue = as.character(traitValue))
+  
+  traits.calculated <- traits.calculated %>% 
+    bind_rows(calc.now) %>% 
+    mutate(basisOfRecord = "calculated from regression")
+}
+# Filter only species of interest
+traits.calculated <- traits.calculated %>% 
+  filter(taxonID %in% species.list$taxonID)
+# Update the overall working trait dataset
+traits.lvl2.ed <- bind_rows(traits.lvl2.ed, traits.calculated)
+```
+
+## Derive numerical traits
+For some traits (e.g., weight-specific rates or percent composition), values can be calculated using other trait information.
+```{r}
+```
+
+## Evaluate and finalize
+```{r}
+# Regenerate the trait subset from the updated dataset
+trait.subset <- traits.lvl2.ed %>% 
+  filter(traitName %in% trait.list) %>% 
+  filter(taxonID %in% species.list$taxonID)
+
+# Evaluate progress of data gap estimation
+trait.subset %>% 
+  distinct(traitName, taxonID) %>% 
+  group_by(traitName) %>% 
+  summarise(Nrecords = n(), .groups = "drop") %>% 
+  mutate(Perc.sp = Nrecords / nrow(species.list) * 100)
+
+```
+
+# If estimating categorical traits
+This is one method for estimating the value of a categorical trait using the getGroupLevelValue() function. The script below searches if a categorical trait value is present in a taxonomic group. Note that this will only identify positive instances and will not provide the relative likelihood of how often a particular trait category appears in a group.
+```{r, warning=FALSE, eval=FALSE}
+# A. Trophic Group
+# For each categorical trait, find the binary versions
+cat.missing <- species.list %>% 
+  filter(taxonID %notin% filter(trait.subset, traitName == "trophicGroup")$taxonID)
+# List the binary version of traits assigned to a categorical trait
+binary.list <- traits.lvl2.ed %>% 
+  filter(grepl("TG.",traitName)) %>% 
+  distinct(traitName)
+# Select level of generalization
+gen.level <- "genus"
+# Loop through each of the binary traits.
+traits.generalized <- s.format
+for (trait in binary.list) {
+  for (taxon in cat.missing$scientificName){
+    gen <- getGroupLevelValue(taxon, trait, gen.level = gen.level, 
+                              trait.df = traits.lvl2, 
+                              taxonomy.df = taxonomy)
+    if(is.data.frame(gen)) {
+      gen <- gen %>%  
+        mutate(traitValue = as.character(traitValue))
+      traits.generalized <- traits.generalized %>% 
+        bind_rows(gen)
+    }
+  }
+}
+
+# B. Feeding Mode
+# For each categorical trait, find the binary versions
+cat.missing <- species.list %>% 
+  filter(taxonID %notin% filter(trait.subset, traitName == "feedingMode")$taxonID)
+# List the binary version of traits assigned to a categorical trait
+binary.list <- traits.lvl2.ed %>% 
+  filter(grepl("FM.",traitName)) %>% 
+  distinct(traitName)
+# Select level of generalization
+gen.level <- "genus"
+# Loop through each of the binary traits.
+for (trait in binary.list) {
+  for (taxon in cat.missing$scientificName){
+    gen <- getGroupLevelValue(taxon, trait, gen.level = gen.level, 
+                              trait.df = traits.lvl2, 
+                              taxonomy.df = taxonomy)
+    if(is.data.frame(gen)) {
+      gen <- gen %>%  
+        mutate(traitValue = as.character(traitValue))
+      traits.generalized <- traits.generalized %>% 
+        bind_rows(gen)
+    }
+  }
+}
+
+```
+

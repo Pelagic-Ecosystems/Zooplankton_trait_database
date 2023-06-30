@@ -1,0 +1,631 @@
+---
+title: "Creating species-level dataset (Level 2)"
+author: "Patrick Pata"
+date: "01/12/2022"
+output: html_document
+---
+
+This file loads the level 1 dataset and calculates the species-level averages for numerical traits, merges the sources of repeated categorical trait records, and adds the binary version of categorical traits. 
+
+The maximum body length trait is calculated for each species. The female or adult total length is selected when possible and the average size is calculated resulting in the mean maximum body length. If a value is not found for a species, the maximum length value across life stages and observations is selected. 
+
+For all other numerical traits, the species level average is calculated. For categorical traits that have similar trait values but have different references are merged into a single row with multiple references for the same observation. Categorical traits are then converted into a binary format. Both the categorical and binary versions are retained in the level 2 trait dataset. Species-level trait values are then derived from numerical traits when a related trait has records.
+
+*NOTE* This code demonstrates how the level 2 data is generated. This will not export the data file. The function updateIDs() is commented here as to not generate new ID numbers and mess up the master_id_list file since the level 2 data file is already generated.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries and functions
+```{r}
+library(tidyverse)
+library(lubridate)
+
+source("toolkit.R")
+```
+
+# Prepare files and folders
+```{r}
+s.format <- read.csv("data_input/trait_dataset_standard_format_20230628.csv")[-1,]
+
+trait.directory <- read.csv("data_input/trait_directory_20230628.csv") %>% 
+  distinct(traitID, .keep_all = TRUE)
+
+# taxonomy table
+taxonomy <- read.csv("data_input/taxonomy_table_20230628.csv") %>% 
+  distinct(taxonID, .keep_all = TRUE)
+
+# stage table
+lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>% 
+  select(-c(majorgroup, notes))
+
+
+infol <- "data_input/Trait_dataset_level1/"
+outfol <- "data_input/Trait_dataset_level2/"
+
+# Load Level 1 dataset
+traits.lvl1 <- read.csv(paste0(infol,"trait_dataset_level1-2023-06-28.csv"))
+```
+
+# Calculate bodyLengthMax trait
+```{r}
+trait.num <- traits.lvl1 %>% 
+  filter(valueType == "numeric") %>% 
+  mutate(traitValue = as.numeric(traitValue))
+
+A <- trait.num %>% 
+  filter(traitName == "bodyLength")
+
+# For copepods, select females and total length when possible
+A.1 <- A %>% 
+  filter(class == "Copepoda") %>% 
+  filter(lifeStage == "female" & sizeType == "total length")
+# females but not in total length
+A.2 <- A %>% 
+  filter(class == "Copepoda") %>% 
+  filter(taxonID %notin% A.1$taxonID) %>% 
+  filter(lifeStage == "female")
+
+# then select "adult"
+A.3 <- A %>% 
+  filter(taxonID %notin% A.1$taxonID) %>% 
+  filter(taxonID %notin% A.2$taxonID) %>% 
+  filter(lifeStage %in% c("adult"))
+
+# Get average for adults and females
+A.4 <- bind_rows(A.1, A.2, A.3) 
+
+# all taxa not in A.4
+B <- A %>% 
+  filter(taxonID %notin% A.4$taxonID) 
+
+# Update IDs, all are new observations because the trait is introduced here.
+trait.length <- bind_rows(A.4, B) %>% 
+  group_by(taxonID) %>% 
+  mutate(individualCount = n(),
+         dispersionSD = sd(traitValue, na.rm = TRUE),
+         traitValue = mean(traitValue, na.rm = TRUE),
+         notes = paste0("taxon level average; ",notes),
+         # mark as derived
+         isDerived = TRUE,
+         catalogSource = paste(catalogNumber, collapse = "; ")) %>% 
+  mergeTraitDetails(trait.directory) %>%
+  mutate(traitName = "bodyLengthMax",
+         basisOfRecord = "calculated taxon average",
+         observationNumber = 1, maxObsNum = 1,
+         catalogNumber = NA) %>% 
+  standardizeID(trait.directory)
+  # updateIDs()
+
+rm(A, A.1, A.2, A.3, A.4, B)
+```
+
+# Calculate species-level averages for numerical traits
+```{r}
+# Calculate the mean associated size for each trait-taxon pair
+sizeAssocSum <- summarise.sizeAssoc(trait.num)
+
+trait.ave <- trait.num %>% 
+  filter(traitName != "bodyLength") %>% 
+  # exclude values not at standard temperature of 15 deg C for respiration, excretion, feeding, and growth rates
+  filter(!(traitID %in% c(75:137) & assocTemperature != 15)) %>% 
+  # if N is NA or if sd is not reported, N = 1
+  mutate(individualCount = if_else(is.na(individualCount), 1, individualCount)) %>% 
+  mutate(individualCount = if_else(is.na(dispersionSD), 1, individualCount)) %>% 
+  # calculate trait-taxon average
+  group_by(traitID, taxonID, traitUnit) %>%  
+  # TODO: fix this mutate so it doesn't do the calculation thrice
+  mutate(nRecords = n(),
+         tvN = getSpeciesMeanSD(traitValue, dispersionSD, individualCount)$N,
+         tvSD = getSpeciesMeanSD(traitValue, dispersionSD, individualCount)$sd,
+         tvVal = getSpeciesMeanSD(traitValue, dispersionSD, individualCount)$mean,
+         traitValue = tvVal, individualCount = tvN, dispersionSD = tvSD,
+         notes = paste0("taxon level average; ",notes),
+         aggregateMeasure = TRUE,
+         basisOfRecord = "calculated taxon average") %>% 
+  dplyr::select(-c(tvVal, tvN, tvSD)) %>% 
+  mergeTraitDetails(trait.directory) %>% 
+  ungroup() %>% 
+  # update the size assoc columns
+  dplyr::select(-c(sizeAssocName, sizeAssocValue, 
+                   sizeAssocSD, sizeAssocN,
+                   sizeAssocUnit, sizeAssocReference)) %>% 
+  left_join(sizeAssocSum, by = c("traitID","taxonID")) 
+
+# Filter which records are based on more than 1 observation and merge with trait.num.
+trait.ave.A <- trait.ave %>% 
+  filter(nRecords == 1)
+trait.ave.B <- trait.ave %>% 
+  filter(nRecords > 1) %>% 
+  select(-nRecords)
+  # remove catalogNumber before merging
+  # mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA) %>% 
+  # updateIDs()
+  
+trait.num <- trait.num %>% 
+  filter(catalogNumber %in% trait.ave.A$catalogNumber) %>% 
+  # merge the species averages
+  bind_rows(trait.ave.B) %>% 
+  # merge bodyLengthMax trait
+  bind_rows(trait.length)
+
+rm(trait.ave.A, trait.ave.B, trait.length, trait.ave)
+```
+
+# Merge references of categorical traits with similar values 
+```{r}
+# Merge records with similar values
+trait.cat <- traits.lvl1 %>% 
+  filter(valueType == "categorical") %>% 
+  group_by(traitID, taxonID, stageID, traitValue, traitUnit) %>% 
+  mergeTraitDetails(trait.directory)
+
+# Records not merged
+trait.cat.A <- trait.cat %>% 
+  filter(is.na(catalogSource))
+# Merged records
+trait.cat.B <- trait.cat %>% 
+  filter(!is.na(catalogSource)) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA)
+
+# Regenerate the categorical traits df with the original records + merged records
+trait.cat <- traits.lvl1 %>% 
+  filter(catalogNumber %in% trait.cat.A$catalogNumber) %>% 
+  bind_rows(trait.cat.B)
+  # updateIDs()
+
+```
+
+# Convert categorical traits to binary
+- Traits with binary matrices: feedingMode, trophicGroup, reproductiveMode, verticalDistribution, myelination, bioluminescence, dvm (+reverse), positive instances of hibernation at any stage
+```{r}
+# Trophic group
+tlist <- c("herbivore", "omnivore", "carnivore", "detritivore", 
+           "parasite", "commensal")
+trait.TG <- trait.cat %>% 
+  filter(traitName == "trophicGroup") %>% 
+  mutate(TG.carnivore = if_else(grepl("carnivore",traitValue)==TRUE,1,0)) %>% 
+  mutate(TG.omnivore = if_else(grepl("omnivore",traitValue)==TRUE,1,0)) %>% 
+  mutate(TG.herbivore = if_else(grepl("herbivore",traitValue)==TRUE,1,0)) %>% 
+  mutate(TG.detritivore = if_else(grepl("detritivore",traitValue)==TRUE,1,0)) 
+# Feeding mode
+# Currently, passive == ambush (not considering commensal/parasite) and particle feeding
+# Ambush feeding has separate column and can be classified into active/passive
+tlist <- c("active","passive","cruise","current","active ambush","passive ambush",
+           "ambush","particle feeder","commensal","parasite")
+trait.FM <- trait.cat %>% 
+  filter(traitName == "feedingMode") %>% 
+  mutate(FM.active = if_else(grepl("active",traitValue)==TRUE & 
+                          grepl("active ambush",traitValue)==FALSE,
+                          1,0)) %>%  
+  mutate(FM.passive = if_else(grepl("passive",traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.cruise = if_else(grepl("cruise",traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.current = if_else(grepl("current",traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.active.ambush = if_else(grepl("active ambush",
+                                       traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.passive.ambush = if_else(grepl("passive ambush",
+                                        traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.ambush = if_else(grepl("ambush",traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.particle.feeder = if_else(grepl("particle feeder",
+                                         traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.commensal = if_else(grepl("commensal",traitValue)==TRUE,1,0)) %>% 
+  mutate(FM.parasite = if_else(grepl("parasite",traitValue)==TRUE,1,0)) %>% 
+  # assign current and cruise as active & ambush and particle feeder as passive 
+  mutate(FM.active = if_else(FM.cruise == 1 | FM.current == 1,
+                             1, FM.active)) %>% 
+  mutate(FM.passive = if_else(FM.ambush == 1 | FM.particle.feeder == 1, 
+                              1, FM.passive))
+
+# Reproduction mode
+tlist <- c("broadcast","brooding","asexual","polyp")
+trait.RM <- trait.cat %>% 
+  filter(traitName == "reproductionMode") %>% 
+  mutate(RM.brooding = if_else(grepl("brooding",traitValue)==TRUE,1,0)) %>% 
+  mutate(RM.broadcasting = if_else(grepl("broadcasting",traitValue)==TRUE,1,0)) %>% 
+  # assign polyp as asexual
+  mutate(RM.asexual = if_else(grepl("asexual",traitValue)==TRUE |
+                              grepl("polyp", traitValue)==TRUE,1,0)) 
+
+# Vertical distribution
+tlist <- c("epi","meso","bathy")
+trait.VD <- trait.cat %>% 
+  filter(traitName == "verticalDistribution") %>% 
+  mutate(VD.epipelagic = if_else(grepl("epi",traitValue)==TRUE,1,0)) %>% 
+  mutate(VD.mesopelagic = if_else(grepl("meso",traitValue)==TRUE,1,0)) %>% 
+  mutate(VD.bathypelagic = if_else(grepl("bathy",traitValue)==TRUE,1,0)) %>% 
+  # if epibathypelagic, meso is true
+  mutate(VD.mesopelagic = if_else(VD.epipelagic == 1 & VD.bathypelagic == 1,
+                                  1, VD.mesopelagic))
+
+# Myelination
+tlist <- c("absent","present","myelin-like","likely absent","likely present")
+trait.MYE <- trait.cat %>% 
+  filter(traitName == "myelination") %>% 
+  # consider myelin-like as true, exclude likely
+  mutate(MYE.absent = if_else(traitValue == "absent",1,0),
+         MYE.present = if_else(traitValue %in% c("present","myelin-like"),1,0)) %>% 
+  filter(MYE.absent == 1 | MYE.present == 1)
+
+# 8-Bioluminescence
+tlist <- c("absent","present","uncertain")
+trait.BIO <- trait.cat %>% 
+  filter(traitName == "bioluminescence") %>% 
+  mutate(BIO.absent = if_else(traitValue == "absent",1,0),
+         BIO.present = if_else(traitValue == "present",1,0)) %>% 
+  # disregard uncertain
+  filter(BIO.absent == 1 | BIO.present == 1)
+
+# DVM
+tlist <- c("absent","present","reverse","weak","strong")
+trait.DVM <- trait.cat %>% 
+  filter(traitName == "dielVerticalMigration") %>% 
+  mutate(DVM.absent = if_else(grepl("absent", traitValue)==TRUE,1,0),
+         DVM.present = if_else(grepl("absent", traitValue)==TRUE,1,0),
+         DVM.reverse = if_else(grepl("reverse", traitValue)==TRUE,1,0),
+         DVM.strong = if_else(grepl("strong", traitValue)==TRUE,1,0),
+         DVM.weak = if_else(grepl("weak", traitValue)==TRUE,1,0)) %>% 
+    # present here is only day at depth, night at surface DVM
+  mutate(DVM.present = if_else(DVM.reverse == 1, 0, DVM.present))    
+  
+# Hibernation - only positive instances at any stage
+# merge resting eggs with hibernation (hibernation at egg stage)
+trait.HIB <- trait.cat %>% 
+  filter(traitName %in% c("hibernationStage", "restingEggs")) %>% 
+  mutate(HIB.present = 1)
+
+# TODO assign the source traitIDs here, remove verbatim records
+
+# Combine binary matrices
+trait.binary <- bind_rows(trait.TG, trait.FM, trait.RM, trait.VD,
+                          trait.MYE, trait.DVM, trait.HIB, trait.BIO) %>% 
+  # Set as derived and assign the source traitIDs
+  mutate(isDerived = TRUE,
+         basisOfRecord = "converted from categorical",
+         catalogSource = catalogNumber) %>% 
+  # Remove verbatim columns
+  removeVerbatimRecords() %>% 
+  relocate(colnames(s.format))
+
+# List the binary traitNames for pivoting
+binaryTraitNames <- data.frame(names = colnames(trait.binary)) %>% 
+  filter(grepl("TG|FM|RM|VD|MYE|DVM|HIB|BIO",names))
+trait.binary <- trait.binary %>% 
+  select(-c(traitName, traitValue)) %>% 
+  pivot_longer(cols = all_of(binaryTraitNames$names), 
+               names_to = "traitName", values_to = "traitValue") %>% 
+  mutate(valueType = "binary", maxObsNum = 0) %>% 
+  filter(traitValue == 1) %>%
+  distinct(traitName, traitValue, taxonID, .keep_all = TRUE) %>% 
+  # Assign trait numbers and update trait-taxon-ID
+  standardizeID(trait.directory) %>% 
+  # mutate(catalogNumber = NA) %>% 
+  # updateIDs() %>% 
+  mutate(traitValue = as.character(traitValue))
+
+```
+
+
+# Curate size: Identify instances when CW > DW > WW
+```{r}
+size.check <- trait.num %>% 
+  filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  filter(traitName %in% c("carbonWeight","dryWeight","wetWeight")) %>% 
+  select(taxonID, scientificName, traitName, traitValue) %>% 
+  pivot_wider(names_from = traitName, values_from = traitValue) %>% 
+  mutate(cw.gr = if_else(carbonWeight > dryWeight, T, F),
+         dw.gr = if_else(dryWeight > wetWeight, T, F))
+
+# Exclude wet weight when dry weight is larger
+size.check.ww <- size.check %>%
+  filter(dw.gr == T)
+
+trait.num <- trait.num %>% 
+  filter(!(traitName == "wetWeight" & taxonID %in% size.check.ww$taxonID))
+
+# Exclude dry weight when carbon weight is larger
+size.check.dw <- size.check %>%
+  filter(cw.gr == T)
+
+trait.num <- trait.num %>% 
+  filter(!(traitName == "dryWeight" & taxonID %in% size.check.dw$taxonID))
+```
+
+
+# Derive some species level trait values
+## Water content
+```{r}
+# waterPWW
+A <- trait.num %>% 
+  filter(traitName == "waterPWW")
+
+# Calculate water content as inverse of dry weight % wet weight
+B <- trait.num %>% 
+  filter(traitName  == "dryWeightPWW") %>% 
+  filter(taxonID %notin% A$taxonID) %>% 
+  group_by(traitID, taxonID) %>%
+  # Derived columns are the original columns
+  mutate(verbatimScientificName = scientificName,
+         verbatimTraitName = traitName,
+         verbatimTraitValue = as.character(traitValue),
+         verbatimTraitUnit = traitUnit,
+         verbatimLifeStage = lifeStage,
+         verbatimNotes = notes,
+         traitName = "waterPWW", traitID = 19,
+         traitValue = 100 - traitValue,
+         dispersionSD = NaN,
+         individualCount = 1,
+         basisOfRecord = "derived from related trait",
+         aggregateMeasure = FALSE,
+         isDerived = TRUE,
+         catalogSource = catalogNumber,
+         notes = paste0("Calculated from dryWeightPWW based on ", catalogNumber),
+         maxObsNum = 0) %>% 
+  ungroup() %>% 
+  standardizeID(trait.directory) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA) %>% 
+  mutate(catalogNumber = as.character(catalogNumber))
+
+# waterPWW
+C <- trait.num %>% 
+  filter(traitName == "dryWeightPWW")
+
+# Calculate water content as inverse of dry weight % wet weight
+D <- trait.num %>% 
+  filter(traitName  == "waterPWW") %>% 
+  filter(taxonID %notin% A$taxonID) %>% 
+  group_by(traitID, taxonID) %>%
+  # Derived columns are the original columns
+  mutate(verbatimScientificName = scientificName,
+         verbatimTraitName = traitName,
+         verbatimTraitValue = as.character(traitValue),
+         verbatimTraitUnit = traitUnit,
+         verbatimLifeStage = lifeStage,
+         verbatimNotes = notes,
+         traitName = "dryWeightPWW", traitID = 20,
+         traitValue = 100 - traitValue,
+         dispersionSD = NaN,
+         individualCount = 1,
+         basisOfRecord = "derived from related trait",
+         aggregateMeasure = FALSE,
+         isDerived = TRUE,
+         catalogSource = catalogNumber,
+         notes = paste0("Calculated from waterPWW based on ", catalogNumber),
+         maxObsNum = 0) %>% 
+  ungroup() %>% 
+  standardizeID(trait.directory) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA) %>% 
+  mutate(catalogNumber = as.character(catalogNumber))
+
+# Add the derived water content to trait.num
+trait.num <- trait.num %>% 
+  bind_rows(B, D)
+  # updateIDs()
+
+rm(A,B,C,D)
+```
+
+
+## Estimate egg carbon content from egg diameter
+```{r}
+A <- trait.num %>% 
+  filter(traitName == "eggWeight")
+
+B <- trait.num %>% 
+  filter(traitName  == "eggDiameter") %>% 
+  filter(taxonID %notin% A$taxonID) %>% 
+  filter(traitUnit == "um") %>% 
+  group_by(traitID, taxonID) %>% 
+  # Derived columns are the original columns
+  mutate(verbatimScientificName = scientificName,
+         verbatimTraitName = traitName,
+         verbatimTraitValue = as.character(traitValue),
+         verbatimTraitUnit = traitUnit,
+         verbatimLifeStage = lifeStage,
+         verbatimNotes = notes,
+         traitName = "eggWeight", traitID = 153,
+         traitValue = (4/3)*pi*(traitValue/2)^3 * (0.14*10^-6),
+         traitUnit = "ug",
+         dispersionSD = NaN,
+         individualCount = 1,
+         basisOfRecord = "derived from related trait",
+         aggregateMeasure = FALSE,
+         isDerived = TRUE,
+         catalogSource = catalogNumber,
+         notes = paste0("Estimated from egg diameter; ", catalogNumber),
+         maxObsNum = 0) %>% 
+  ungroup() %>% 
+  standardizeID(trait.directory) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA)
+
+# Add the derived water content to trait.num
+trait.num <- trait.num %>% 
+  bind_rows(B) 
+  # updateIDs()
+
+rm(A, B)
+```
+
+
+## Composition
+```{r}
+ww <- trait.num %>% 
+  filter(traitName == "wetWeight") %>% 
+  mutate(sizeAssocReference = if_else(!is.na(secondaryReference),
+                                      secondaryReference, primaryReference)) %>% 
+  select(taxonID, sizeAssocName = traitName, 
+         sizeAssocValue = traitValue, sizeAssocUnit = traitUnit,
+         sizeAssocReference)
+dw <- trait.num %>% 
+  filter(traitName == "dryWeight") %>% 
+  mutate(sizeAssocReference = if_else(!is.na(secondaryReference),
+                                      secondaryReference, primaryReference)) %>% 
+  select(taxonID, sizeAssocName = traitName, 
+         sizeAssocValue = traitValue, sizeAssocUnit = traitUnit,
+         sizeAssocReference)
+cw <- trait.num %>% 
+  filter(traitName == "carbonWeight") %>% 
+  mutate(sizeAssocReference = if_else(!is.na(secondaryReference),
+                                      secondaryReference, primaryReference)) %>% 
+  select(taxonID, sizeAssocName = traitName, 
+         sizeAssocValue = traitValue, sizeAssocUnit = traitUnit,
+         sizeAssocReference)
+
+# Carbon
+C1 <- convertTotal2PW(trait.num, dw, "carbonPDW", "carbonWeight")
+C2 <- convertTotal2PW(trait.num, ww, "carbonPWW", "carbonWeight") # can contain some really large values
+C3 <- convertPW2Total(trait.num, cw, "carbonWeight", "carbonPDW")
+
+# Nitrogen & Phosphorus
+N1 <- convertTotal2PW(trait.num, dw, "nitrogenPDW", "nitrogenTotal")
+N2 <- convertPW2Total(trait.num, dw,  "nitrogenTotal", "nitrogenPDW")
+P1 <- convertTotal2PW(trait.num, dw, "phosphorusPDW", "phosphorusTotal")
+P2 <- convertPW2Total(trait.num, dw, "phosphorusTotal", "phosphorusPDW")
+
+# Ash
+ash1 <- convertTotal2PW(trait.num, dw, "ashPDW", "ashTotal") 
+ash2 <- convertPW2Total(trait.num, dw, "ashTotal", "ashPDW") 
+
+# dryweightPWW from wetWeight and dryWeight
+dwpww <- convertTotal2PW(trait.num, ww, "dryWeightPWW","dryWeight") %>% 
+  filter(taxonID %notin% filter(trait.num, traitName == "dryWeightPWW")$taxonID)
+waterpww <- dwpww %>% 
+  filter(taxonID %notin% filter(trait.num, traitName == "waterPWW")$taxonID) %>% 
+  mutate(traitValue = 100 - traitValue, 
+         basisOfRecord = "derived from related trait", isDerived = TRUE,
+         catalogSource = catalogNumber, verbatimTraitName = traitName,
+         verbatimTraitUnit = traitUnit, verbatimNotes = notes,
+         traitName = "waterPWW", traitID = 19) %>% 
+  mutate(observationNumber = NA, maxObsNum = NA)
+
+
+derived.comp <- bind_rows(C1, C2, C3, N1, N2, P1, P2, 
+                          ash1, ash2, waterpww, dwpww) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA)
+
+trait.num <- trait.num %>% 
+  bind_rows(derived.comp)
+  # updateIDs()
+```
+
+## Elemental ratios
+```{r}
+rCN <- calculateRatio(trait.num, "ratioCN", "carbonWeight", "nitrogenTotal")
+rCP <- calculateRatio(trait.num, "ratioCP", "carbonWeight", "phosphorusTotal")
+rNP <- calculateRatio(trait.num, "ratioNP", "nitrogenTotal", "phosphorusTotal")
+
+derived.ratio <- bind_rows(rCN, rCP, rNP) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA)
+
+trait.num <- trait.num %>% 
+  bind_rows(derived.ratio)
+  # updateIDs()
+```
+
+
+
+## Weight-specific rates
+These are for rate values with no associated size values or if associated size is different.
+Note both N & P excretion rates dont require this.
+```{r}
+rate.R1.a <- convertRateInd2WS(trait.num, dw, "respirationRate_WSDW_15C",
+                             "respirationRate_15C", "ul O2 mg DW^-1 h^-1")
+rate.R1.b <- convertRateWS2Ind(trait.num, dw, "respirationRate_15C",
+                               "respirationRate_WSDW_15C", "ul O2 h^-1")
+rate.R3.a <- convertRateInd2WS(trait.num, cw, "respirationRate_WSC_15C","respirationRate_15C",
+                     "ul O2 mg C^-1 h^-1")
+rate.R3.b <- convertRateWS2Ind(trait.num, cw, "respirationRate_15C",  
+                               "respirationRate_WSC_15C", "ul O2 h^-1") %>% 
+  filter(taxonID %notin% rate.R1.b$taxonID) 
+rate.R2.a <- convertRateInd2WS(trait.num, ww, "respirationRate_WSWW_15C",
+                             "respirationRate_15C", "ul O2 mg WW^-1 h^-1")
+rate.R2.b <- convertRateWS2Ind(trait.num, ww, "respirationRate_15C",  
+                               "respirationRate_WSWW_15C", "ul O2 h^-1") %>% 
+  filter(taxonID %notin% rate.R1.b$taxonID) %>% 
+  filter(taxonID %notin% rate.R3.b$taxonID)
+
+rate.R.b <- bind_rows(rate.R1.b, rate.R2.b, rate.R3.b) 
+
+
+rate.C.a <- convertRateInd2WS(trait.num, cw, "clearanceRate_WSC_15C","clearanceRate_15C",
+                     "ml mg C^-1 h^-1")
+rate.C.b <- convertRateWS2Ind(trait.num, cw, "clearanceRate_15C", "clearanceRate_WSC_15C",
+                     "ml h^-1")
+rate.I.a <- convertRateInd2WS(trait.num, cw, "ingestionRate_WSC_15C","ingestionRate_15C",
+                     "ug C mg C^-1 h^-1")
+rate.I.b <- convertRateWS2Ind(trait.num, cw, "ingestionRate_15C","ingestionRate_WSC_15C",
+                     "ug C h^-1")
+rate.EN.a <- convertRateInd2WS(trait.num, dw, "excretionRateN_WSDW_15C","excretionRateN_15C",
+                     "ug N-NH4+ mg DW^-1 h^-1")
+rate.EN.b <- convertRateWS2Ind(trait.num, dw, "excretionRateN_15C","excretionRateN_WSDW_15C",
+                     "ug N-NH4+ h^-1")
+rate.EP.a <- convertRateInd2WS(trait.num, dw, "excretionRateP_WSDW_15C","excretionRateP_15C",
+                     "ug P-PO43- mg DW^-1 h^-1")
+rate.EP.b <- convertRateWS2Ind(trait.num, dw, "excretionRateP_15C","excretionRateP_WSDW_15C",
+                     "ug P-PO43- h^-1")
+
+# Most WS2Ind return empty dataframes but retain the code here so it is updatable.
+derived.rates <- bind_rows(rate.R1.a, rate.R2.a, rate.R3.a, rate.R.b, 
+                          rate.C.a, rate.I.a, rate.EN.a, rate.EP.a,
+                          rate.C.b, rate.I.b, rate.EN.b, rate.EP.b) %>% 
+  mutate(catalogNumber = NA, observationNumber = NA, maxObsNum = NA)
+
+trait.num <- trait.num %>% 
+  bind_rows(derived.rates) 
+  # updateIDs()
+```
+
+# Finalize and filter traits
+```{r}
+trait.num <- trait.num %>% 
+  # Remove rate traits not standardized to 15 deg C
+  filter(traitName %notin% c("clearanceRate","clearanceRate_WSC",
+                          "ingestionRate","ingestionRate_WSC",
+                          "filtrationRate","filtrationRate_WSC",
+                          "growthRate","growthRate_WSC",
+                          "growthRatePLength",
+                          "respirationRate","respirationRate_WSDW",
+                          "respirationRate_WSWW","respirationRate_WSC",
+                          "excretionRateN","excretionRateN_WSDW",
+                          "excretionRateP","excretionRateP_WSDW")) 
+
+traits.lvl2 <- trait.num %>% 
+  mutate(traitValue = as.character(traitValue)) %>%
+  bind_rows(trait.cat) %>% 
+  # Remove cubozoans
+  filter(majorgroup %notin% c("Cubozoan"))
+
+# Exclude traits with N <= 30 taxa 
+exclude.traits <- traits.lvl2 %>% 
+  # filter(taxonRank %in% c("Species","Subspecies")) %>% 
+  group_by(traitID, traitName, taxonID, scientificName, taxonRank) %>% 
+  summarise(n = n()) %>% 
+  group_by(traitID, traitName) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  filter(n <= 30)
+
+traits.lvl2.excluded <- traits.lvl2 %>% 
+  filter(traitID %in% exclude.traits$traitID) 
+
+traits.lvl2 <- traits.lvl2 %>% 
+  filter(traitID %notin% exclude.traits$traitID) %>% 
+  # add binary traits
+  bind_rows(trait.binary)
+```
+
+
+# Export to csv files
+```{r, eval=FALSE}
+# write.csv(traits.lvl2,
+#           file = paste0(outfol,"trait_dataset_level2-",
+#                    ymd(Sys.Date()),".csv"), 
+#           row.names = FALSE)
+# write.csv(traits.lvl2.excluded,
+#           file = paste0(outfol,"trait_dataset_level2_excluded-",
+#                    ymd(Sys.Date()),".csv"), 
+#           row.names = FALSE)
+```
+
+
+
