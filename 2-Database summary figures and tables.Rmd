@@ -141,7 +141,7 @@ bplot <- ggplot(trait.sum, aes(x = traitName, y = Nsp.mg,
   theme_bw() +
   theme(strip.placement = "outside", text = element_text(size = 20),
         legend.position = c(0.8, 0.5),
-        legend.background = element_rect(fill = "white", colour = "black")) 
+        legend.background = element_rect(fill = "white", colour = NA)) 
 bplot 
 
 ggsave(filename = "figures/fig_3_coverage_barplot_species.png",
