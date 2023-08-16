@@ -48,7 +48,7 @@ infol <- "data_input/Trait_dataset_level2/"
 outfol <- "data_input/Trait_dataset_level2/"
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-08-15.csv"))
 
 # # Count number of data records
 # traits.lvl2 %>% filter(valueType %in% c("numeric","categorical")) %>% 

@@ -45,7 +45,7 @@ infol <- "data_input/Trait_dataset_level1/"
 outfol <- "data_input/Trait_dataset_level2/"
 
 # Load Level 1 dataset
-traits.lvl1 <- read.csv(paste0(infol,"trait_dataset_level1-2023-06-28.csv"))
+traits.lvl1 <- read.csv(paste0(infol,"trait_dataset_level1-2023-08-15.csv"))
 ```
 
 # Calculate bodyLengthMax trait
@@ -261,7 +261,7 @@ tlist <- c("absent","present","reverse","weak","strong")
 trait.DVM <- trait.cat %>% 
   filter(traitName == "dielVerticalMigration") %>% 
   mutate(DVM.absent = if_else(grepl("absent", traitValue)==TRUE,1,0),
-         DVM.present = if_else(grepl("absent", traitValue)==TRUE,1,0),
+         DVM.present = if_else(grepl("present", traitValue)==TRUE,1,0),
          DVM.reverse = if_else(grepl("reverse", traitValue)==TRUE,1,0),
          DVM.strong = if_else(grepl("strong", traitValue)==TRUE,1,0),
          DVM.weak = if_else(grepl("weak", traitValue)==TRUE,1,0)) %>% 

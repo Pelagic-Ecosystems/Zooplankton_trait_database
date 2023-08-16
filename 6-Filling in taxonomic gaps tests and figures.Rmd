@@ -49,10 +49,10 @@ lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>%
   select(-c(majorgroup, notes))
 
 # Load Level 1 dataset
-traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-06-28.csv")
+traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-08-15.csv")
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-06-28.csv")
+traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-08-15.csv")
 
 # Consider all species-level traits and get the phylogenetic tree for these species.
 load("data_input/phylo_tree_trait_level2_20230501.RData")

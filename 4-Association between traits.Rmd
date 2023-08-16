@@ -23,7 +23,7 @@ library(rcompanion) # For Craymer's V
 library(cowplot)
 
 source("toolkit.R")
-source("toolkit_analysis.R")
+# source("toolkit_analysis.R")
 ```
 
 
@@ -47,7 +47,7 @@ infol <- "data_input/Trait_dataset_level2/"
 outfol <- "data_input/Trait_dataset_level2/"
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-06-28.csv"))
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-08-15.csv"))
 
 # Consider all species-level traits and get the phylogenetic tree for these species.
 load("data_input/phylo_tree_trait_level2_20230501.RData")
@@ -245,15 +245,15 @@ for (i in c(1:nrow(trait.cor))){ #
   }
 }
 
-# # Export results
-# save(cor.phylo.tests, file = "data_output/corphylo_20230410_traitmatrix.RData")
+# Export results
+save(cor.phylo.tests, file = "data_output/corphylo_20230815_traitmatrix.RData")
 ```
 
 ## Organize results of correlation tests
 On average, the with phylo effects model results in a stronger correlation and ranks better as a model compared to a no phylo effects model (both with no ME).
 ```{r}
-# Load the results of the chunk above
-load("data_output/corphylo_20230410_traitmatrix.RData")
+# # Load the results of the chunk above
+# load("data_output/corphylo_20230410_traitmatrix.RData")
 
 # Prepare a summary table from the cor phylo test results
 B1 <- cor.phylo.tests %>% 
@@ -276,6 +276,7 @@ B <- cor.phylo.tests %>%
   left_join(B2, by = "analysis") %>% 
   relocate(test.num)
 
+cc <- nrow(B)
 C <- cor.phylo.tests %>% 
   filter(model.type == "phylo.no.me") %>% 
   mutate(trait.coef = rep(c("trait1","trait2"), times = cc))

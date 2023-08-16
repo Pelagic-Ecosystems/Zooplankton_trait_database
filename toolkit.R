@@ -345,6 +345,13 @@ calculateRatio <- function(df, ratio, trtName1, trtName2){
            catalogSource = paste0(catalogNumber.x, "; ", catalogNumber.y),
            isDerived = TRUE,
            observationNumber = 1, maxObsNum = 1, traitID = NA) %>% 
+    # Above is ratio by weight so convert to molar ratio
+    mutate(traitValue = if_else(traitName == "ratioCN", 
+                                traitValue * (14.0067/12.011), traitValue)) %>% 
+    mutate(traitValue = if_else(traitName == "ratioCP", 
+                                traitValue * (30.97376/12.011), traitValue)) %>% 
+    mutate(traitValue = if_else(traitName == "ratioNP", 
+                                traitValue * (30.97376/14.0067), traitValue)) %>% 
     # exclude values outside the range of observed values
     filter(traitValue >= min(D.0$traitValue) & traitValue <= max(D.0$traitValue)) %>% 
     select(-c(catalogNumber.x, catalogNumber.y, traitValue1, traitValue2)) %>% 
@@ -420,12 +427,12 @@ mergeTraitDetails <- function(df, trait.directory, rev.by = "P. Pata") {
            # verbatimNotes = cleanStrings(verbatimNotes),
            catalogSource = cleanStrings(catalogNumber) )%>% 
     distinct(catalogSource, .keep_all = TRUE) %>% 
-    ungroup() %>% 
     # mutate(observationNumber = NA) %>% 
     # updateIDs() %>% 
     mutate(notes = cleanStrings(paste("Trait value merged from multiple records.; ", notes))) %>% 
     # update upload date
-    mutate(uploadBy = rev.by, uploadDate = as.character(ymd(Sys.Date())))
+    mutate(uploadBy = rev.by, uploadDate = as.character(ymd(Sys.Date()))) %>% 
+    ungroup() 
   
   df <- bind_rows(df.same, df.updated) %>% 
     select(-dup)
