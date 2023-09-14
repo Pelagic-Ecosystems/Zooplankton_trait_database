@@ -9,8 +9,23 @@ This script is a template for extracting a subset of the trait database for the 
 
 # Load libraries and data
 ```{r}
-library(tidyverse)
-library(openxlsx)
+packages <- c("tidyverse",
+              "openxlsx")
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
+
 source("toolkit.R")
 
 

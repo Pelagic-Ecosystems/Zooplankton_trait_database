@@ -13,10 +13,24 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load libraries and functions
 ```{r}
-library(tidyverse)
-library(gplots) # for converting color names to hex format
-library(phyr)
-library(rotl) # for phylo distance
+packages <- c("tidyverse", 
+              "phyr", "ape",
+              "gplots", # For converting color names to hex format
+              "rotl") # For tree of life functions
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 source("toolkit.R")
 ```

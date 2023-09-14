@@ -18,15 +18,28 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load libraries and functions
 ```{r}
-library(tidyverse)
-library(openxlsx)
-library(lubridate)
-library(ggpubr) # for regression line in ggplot
-library(lmodel2)
-library(ggnewscale) # for having multiple color scales in ggplot
-library(cowplot)
-library(phylolm) # for regressions with phylogenetic effects
-library(Rphylopars) # for phylogenetic imputation
+packages <- c("tidyverse", "lubridate",
+              "ggpubr", # For regression line in ggplot
+              "lmodel2", # For option of type 2 regressions such as RMA
+              "phylolm", # For linear models accounting for phylogenetic effects
+              "ggnewscale", # For having multiple color scales in ggplot
+              "Rphylopars", # For phylogenetic imputation
+              "cowplot",
+              "openxlsx")
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 source("toolkit.R")
 

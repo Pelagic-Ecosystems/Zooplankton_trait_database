@@ -17,14 +17,25 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load libraries and functions
 ```{r}
-library(tidyverse)
-library(openxlsx)
-library(lubridate)
-library(ggbreak) # cite: 10.3389/fgene.2021.774846
-library(cowplot)
+packages <- c("tidyverse", "lubridate", 
+              "ggbreak", # For figure 3 breaks, cite: 10.3389/fgene.2021.774846.
+              "cowplot") 
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 source("toolkit.R")
-
 # theme_set(theme_bw())
 ```
 

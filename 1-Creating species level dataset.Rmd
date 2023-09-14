@@ -11,16 +11,30 @@ The maximum body length trait is calculated for each species. The female or adul
 
 For all other numerical traits, the species level average is calculated. For categorical traits that have similar trait values but have different references are merged into a single row with multiple references for the same observation. Categorical traits are then converted into a binary format. Both the categorical and binary versions are retained in the level 2 trait dataset. Species-level trait values are then derived from numerical traits when a related trait has records.
 
-*NOTE* This code demonstrates how the level 2 data is generated. This will not export the data file. The function updateIDs() is commented here as to not generate new ID numbers and mess up the master_id_list file since the level 2 data file is already generated.
+*NOTE* This code demonstrates how the level 2 data is generated. This will not export the data file. The function updateIDs() is commented here as to not generate new ID numbers and mess with the master_id_list file since the level 2 data file is already generated.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # Load libraries and functions
 ```{r}
-library(tidyverse)
-library(lubridate)
+packages <- c("tidyverse", "lubridate")
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 source("toolkit.R")
 ```

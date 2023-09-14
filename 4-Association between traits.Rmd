@@ -16,11 +16,24 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load libraries and functions
 ```{r}
-library(tidyverse)
-library(lubridate)
-library(phyr)
-library(rcompanion) # For Craymer's V
-library(cowplot)
+packages <- c("tidyverse", "lubridate",
+              "phyr", 
+              "rcompanion", # For Cramer's V
+              "cowplot") # For tree of life functions
+
+# Function to download the packages if necessary. Otherwise, these are loaded.
+package.check <- lapply(
+  packages,
+  FUN = function(x)
+  {
+    if (!require(x, character.only = TRUE))
+    {
+      install.packages(x, dependencies = TRUE,
+                       repos = "http://cran.us.r-project.org")
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 source("toolkit.R")
 # source("toolkit_analysis.R")
@@ -252,8 +265,8 @@ save(cor.phylo.tests, file = "data_output/corphylo_20230815_traitmatrix.RData")
 ## Organize results of correlation tests
 On average, the with phylo effects model results in a stronger correlation and ranks better as a model compared to a no phylo effects model (both with no ME).
 ```{r}
-# # Load the results of the chunk above
-# load("data_output/corphylo_20230410_traitmatrix.RData")
+# Load the results of the chunk above
+load("data_output/corphylo_20230815_traitmatrix.RData")
 
 # Prepare a summary table from the cor phylo test results
 B1 <- cor.phylo.tests %>% 
