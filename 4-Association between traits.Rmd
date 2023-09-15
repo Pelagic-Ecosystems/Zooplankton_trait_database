@@ -60,7 +60,7 @@ infol <- "data_input/Trait_dataset_level2/"
 outfol <- "data_input/Trait_dataset_level2/"
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-08-15.csv"))
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-09-14.csv"))
 
 # Consider all species-level traits and get the phylogenetic tree for these species.
 load("data_input/phylo_tree_trait_level2_20230501.RData")
@@ -201,11 +201,6 @@ trait.num.phylo[ii,]$traitValue = log10(trait.num.phylo[ii,]$traitValue)
 ii <- which(trait.num.phylo$transformation == "logit")
 trait.num.phylo[ii,]$traitValue = logitTransform(trait.num.phylo[ii,]$traitValue)
 
-```
-
-
-## Calculate correlations with phylogenetic effect
-```{r, warning = FALSE, eval=FALSE}
 # Identify and order which traits to correlate
 trait.size <- c("bodyLengthMax","carbonWeight","dryWeight","wetWeight")
 trait.water <- c("waterPWW","dryWeightPWW","carbonPWW")
@@ -226,7 +221,11 @@ trait.rate <- c("respirationRate_15C", "respirationRate_WSC_15C",
 trait.repro <- c("developmentDuration",
                  "eggDiameter","eggWeight","clutchSize","fecundity")
 trait.list <- c(trait.size, trait.water, trait.comp, trait.rate, trait.repro)
+```
 
+
+## Calculate correlations with phylogenetic effect
+```{r, warning = FALSE, eval=FALSE}
 # Check if any traits are missing
 traits.lvl2 %>% filter(valueType == "numeric") %>%  distinct(traitName) %>% 
   filter(traitName %notin% trait.list)
@@ -259,14 +258,14 @@ for (i in c(1:nrow(trait.cor))){ #
 }
 
 # Export results
-save(cor.phylo.tests, file = "data_output/corphylo_20230815_traitmatrix.RData")
+save(cor.phylo.tests, file = "data_output/corphylo_20230914_traitmatrix.RData")
 ```
 
 ## Organize results of correlation tests
 On average, the with phylo effects model results in a stronger correlation and ranks better as a model compared to a no phylo effects model (both with no ME).
 ```{r}
 # Load the results of the chunk above
-load("data_output/corphylo_20230815_traitmatrix.RData")
+load("data_output/corphylo_20230914_traitmatrix.RData")
 
 # Prepare a summary table from the cor phylo test results
 B1 <- cor.phylo.tests %>% 
@@ -316,9 +315,16 @@ cor.table <- B %>%
   left_join(distinct(cor.phylo.tests, analysis, list), by = "analysis")
 rm(B1, B2, B, cc, C, C1, C2, C3)
 
-# Exclude correlations with <10 N.pairs (~5% of max N.pairs)
-cor.table <- cor.table %>% 
-  filter(N.pairs > 10) 
+# How many correlations |r| > 0.5
+cor.table %>% 
+  filter(abs(r.phylo) > 0.5) %>% 
+  filter(N.pairs > 30) %>% 
+  nrow()
+nrow(cor.table)
+
+# # Exclude correlations with <10 N.pairs (~5% of max N.pairs)
+# cor.table <- cor.table %>% 
+#   filter(N.pairs > 10) 
 ```
 
 ##  Plot correlation matrix figure 
@@ -381,7 +387,7 @@ g1 <- ggplot() +
   # Correlation data
   geom_point(data = cor.table.2, aes(x = trait1.num, y = trait2.num, color = r.mag,
                         fill = r.phylo, size = N.species),
-             shape = 21,) +
+             shape = 21, color = "grey70") +
   geom_point(data = filter(cor.table.2, r.phylo >= 0.5),
              aes(x = trait1.num, y = trait2.num, fill = r.phylo, size = N.species),
              shape = 21, color = "black", stroke = 1) +
@@ -389,12 +395,14 @@ g1 <- ggplot() +
   #                      limits = c(-1,1), name = "corr coef") +
   scale_color_manual(values = c("black",NA), guide = "none") +
   scale_fill_gradient2(low = "blue3", mid = "white", high = "red2", 
-                       limits = c(-1,1), name = "r.phylo") +
+                       limits = c(-1,1), 
+                       name = expression(italic(r)[phylo])) +
   
   scale_x_discrete(limits = trait.list) +
   scale_y_reverse(breaks = 1:length(trait.list), labels = trait.list,
                   limits = c(length(trait.list)+0.5,0.5), expand = c(0, 0))+
-  scale_size_continuous(breaks = c(10,100,200,250), name = "N") +
+  scale_size_continuous(breaks = c(10,100,200,250), 
+                        name = expression(N[pairs])) +
   # scale_y_discrete(limits = (trait.list))  +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45,  hjust=1),
@@ -534,14 +542,15 @@ v.table %>%
 
 g2 <- ggplot(v.table, aes(x = trait1, y = trait2,
                         fill = V, size = N.species)) +
-  geom_point(shape = 21) +
+  geom_point(shape = 21, color = "grey70") +
   geom_point(data = filter(v.table, V >= 0.5),
              aes(x = trait1, y = trait2), shape = 21, color = "black", stroke = 1) +
   
   # scale_fill_distiller(palette = "YlOrRd", limits = c(0,1)) +
   scale_fill_gradient(low = "white", high = "red2",
-                       limits = c(0,1), name = "V") +
-  scale_size_continuous(breaks = c(100, 250, 500), name = "N") +
+                       limits = c(0,1), name = expression(italic(V))) +
+  scale_size_continuous(breaks = c(100, 250, 500), 
+                        name = expression(N[pairs])) +
   scale_y_discrete(limits = rev(trait.list.cat)) +
   # scale_x_discrete(position = "top") +
   theme_bw() +
@@ -571,3 +580,7 @@ cowplot::ggdraw() +
 ggsave("figures/fig_6_association_between_traits.png",
        width = 14, height = 13, units = "in", dpi = 600)
 ```
+```{r}
+
+```
+

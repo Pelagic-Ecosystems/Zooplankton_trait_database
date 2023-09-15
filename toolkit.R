@@ -10,7 +10,7 @@
 # 
 # ** Data curation functions **
 #
-# pooled.sd(SDarray, Narray): Calculates the pooled SD from two SDs.This is 
+# pooled.sd(SDarray, Narray): Calculates the pooled SD from two SDs. This is 
 #   similar to the weighted mean. Note that this will only work if both arrays 
 #   have N > 1.
 # getSpeciesMeanSD(traitValue, dispersionSD, individualCount): Calculate the 
@@ -104,7 +104,7 @@ geomean <- function(x) {  exp(mean(log(x), na.rm = TRUE))  }
 
 # Transformations for proportional or percent data. 
 #  According to http://strata.uga.edu/8370/rtips/proportions.html. Logit is 
-#  preferred because range is (-inf, inf), for regressions while arcsine is 
+#  preferred for regressions because range is (-inf, inf), while arcsine is 
 #  preferred for ordination and clustering because range is [0, 1] which 
 #  works for multivariate methods. Both are linear at 0.3-0.7 range, logit 
 #  gives a stronger transformation at the ends.
@@ -125,7 +125,7 @@ logitTransform <- function(x) {
   # if percent data, change to proportion
   if (max(x) > 1 & min(x) >= 0 & max(x) <= 100) {
     x <- x/100
-  } else if(min(x) <= 0 | max(x) <= 1){
+  } else if(min(x) <= 0 | max(x) > 100){
     stop("Error: Data must either be proportion [0,1] or percentage [0, 100]")
   }
   log(x/(1-x)) 
@@ -339,6 +339,7 @@ calculateRatio <- function(df, ratio, trtName1, trtName2){
   D.3 <- inner_join(D.1, D.2, by = "taxonID") %>% 
     mutate(traitValue = traitValue1/traitValue2, traitName = ratio, 
            traitUnit = NA, 
+           valueType = "numeric",
            basisOfRecord = "derived from related trait",
            notes = paste0("Calculated from ",trtName1," and ",
                           trtName2),
@@ -358,8 +359,7 @@ calculateRatio <- function(df, ratio, trtName1, trtName2){
     standardizeID(trait.directory)
 }
 
-# For merging duplicated trait values or taxa-level averages. 
-#    Note that this should be called for a grouped dataframe.
+# For merging duplicated trait values or taxa-level averages. Note that this should be called for a grouped dataframe.
 mergeTraitDetails <- function(df, trait.directory, rev.by = "P. Pata") {
   df <- df %>% 
     mutate(dup = n())
@@ -520,7 +520,7 @@ standardizeUnit <- function(data, trait.directory){
 #   updateIDs is called
 updateIDs <- function(data) {
   # Create and update a masterIDList file which is loaded and updated by this function.
-  #  This would be a safer approach when records are curated out so a trait and species 
+  #  This would be a safer approach when records are curated so a trait and species 
   #  may completely be excluded and thus the maxObsNum resets to 0.
   load("data_input/master_id_list.RData")
   
@@ -554,9 +554,8 @@ updateIDs <- function(data) {
   
   save(master.ID.List, file = "data_input/master_id_list.RData")
   
-  # TODO delete this
-  print(paste0("Updated master ID list. N rows = ", nrow(master.ID.List),
-               " N maxObsNum = ", length(unique(master.ID.List$maxObsNum))))
+  # print(paste0("Updated master ID list. N rows = ", nrow(master.ID.List),
+  #              " N maxObsNum = ", length(unique(master.ID.List$maxObsNum))))
   
   return(data)
 }
@@ -799,14 +798,14 @@ getMaxObsNum <- function(traitName, taxonID, df) {
 #   generate an updated catalogNumber and this should created if including the 
 #   generalized trait observation in the overall trait table.
 getGroupLevelValue <- function(taxon, trait, gen.level = "genus", trait.df, taxonomy.df){
-  # check if trait is continuous or binary
+  # check if trait is numeric or binary
   trait.type <- trait.df %>% 
     filter(traitName == trait) %>% 
     filter(row_number()==1) %>% 
     select(valueType)
   
-  if (trait.type$valueType %notin% c("continuous","binary")) {
-    stop("Error: Please select a trait that is either continuous or binary.")
+  if (trait.type$valueType %notin% c("numeric","binary")) {
+    stop("Error: Please select a trait that is either numeric or binary.")
   }
   
   
@@ -995,7 +994,8 @@ calculateFromModel <- function(df, model, trait.directory, excludeWithLit = TRUE
     select(-c(primaryReferenceDOI, secondaryReferenceDOI, catalogNumber, 
               sizeAssocName, sizeAssocUnit, sizeAssocValue,
               sizeAssocN, sizeAssocSD, assocTemperature,
-              sizeAssocReference, verbatimLocality, decimalLongitude, decimalLatitude, notes,
+              sizeAssocReference, verbatimLocality, 
+              decimalLongitude, decimalLatitude, notes,
               aggregateMeasure, isDerived, catalogSource, basisOfRecordDescription)) %>%  
     filter(str_detect(group, model$grp),
            traitName %in% model$X) %>% 
@@ -1117,7 +1117,7 @@ plotAllometric <- function(df, grp, X, Y, base = "10") {
 }
 
 # Plot regression line with confidence intervals - this only plots the function 
-#  but not the data points
+#  but not the data points.
 plotRegModel <- function(model){
   model <- model[1,]
   

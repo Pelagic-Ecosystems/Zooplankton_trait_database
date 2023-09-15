@@ -5,7 +5,7 @@ date: "06/30/2023"
 output: html_document
 ---
 
-This script is a template for extracting a subset of the trait database for the local species pool and a set of traits. This template was made for species-level (level 2) data. Note that this only provides examples for a few traits and the choice of methods to use is user-dependent.
+This script is a template for extracting a subset of the trait database for a local species pool and a set of traits. This template was made for species level (level 2) data. Note that this only provides examples for a few traits and the choice of methods to use is user-dependent.
 
 # Load libraries and data
 ```{r}
@@ -45,7 +45,7 @@ lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>%
 # traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-06-28.csv")
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-08-15.csv")
+traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-09-14.csv")
 
 # Change assocTemperature column class to allow row binds
 traits.lvl2$assocTemperature <- as.character(traits.lvl2$assocTemperature)
@@ -55,11 +55,13 @@ traits.lvl2$verbatimTemperature <- as.character(traits.lvl2$verbatimTemperature)
 
 # List selected species and traits
 ```{r}
+# List of traits to extract
 trait.list <- c("bodyLengthMax","dryWeight","carbonWeight","respirationRate_15C",
                 "respirationRate_WSC_15C","nitrogenTotal","excretionRateN_15C",
                 "trophicGroup","feedingMode")
 
-# Need to know the species name that matches the species names in this database
+# List of species to extract
+# Need to know the species name that matches the species names in this database. Alternatively, can do this matching using AphiaIDs and the acceptedNameUsageID field.
 species.list <- data.frame(Species = c("Calanus marshallae",
                                        "Calanus pacificus",
                                        "Cyphocaris challengeri",
@@ -71,6 +73,7 @@ species.list <- data.frame(Species = c("Calanus marshallae",
                                        "Neocalanus plumchrus",
                                        "Oikopleura dioica",
                                        "Oithona similis",
+                                       "Oncaea prolata",
                                        "Paraeuchaeta elongata",
                                        "Scina borealis",
                                        "Tomopteris pacifica",
@@ -87,9 +90,11 @@ species.list <- data.frame(Species = c("Calanus marshallae",
 # Subset the species and traits 
 This will return the trait values based on literature or derived using related traits.
 ```{r}
+# Create a subset of records based on the species and traits list.
 trait.subset <- traits.lvl2 %>% 
   filter(traitName %in% trait.list) %>% 
-  filter(taxonID %in% species.list$taxonID)
+  filter(taxonID %in% species.list$taxonID) %>% 
+  arrange(scientificName)
 
 # Evaluate how many species have trait information
 trait.subset %>% 
@@ -130,7 +135,7 @@ for (taxon in missing.length$scientificName){
 # Add generalized to trait dataset
 traits.lvl2.ed <- bind_rows(trait.subset, traits.generalized)
 
-# A. If using previously calculated models.
+# *** If using previously calculated models. ***
 # Load and curate a file of regression results. These are OLS regressions calculated from the level 2 database. The column "select" was manually added during model selection and can be revised in a spreadsheet to make model curation easier. 
 allomModels <- openxlsx::read.xlsx("data_output/regression_results_OLS_2023-04-11_ed.xlsx") %>% 
   mutate(base = as.character(base)) %>% 
@@ -147,7 +152,7 @@ traits.lvl2.ed <- traits.lvl2.ed %>%
   mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
          "All Crustaceans", group))
 
-# Calculate weights first since these are used in estimating traits
+# Calculate weights first since these are used in estimating traits.
 ## i. Dry weight
 allomModels.dryWeight <- allomModels %>% 
   filter(Y  == "dryWeight")
@@ -241,16 +246,15 @@ traits.lvl2.ed <- bind_rows(traits.lvl2, traits.generalized) %>%
          "All Crustaceans Copepods", group)) %>% 
   mutate(group = if_else(phylum == "Arthropoda" & class != "Copepoda",
          "All Crustaceans", group))
-```
 
-## Other numerical traits
-```{r}
+
+## iii. Other numerical traits that use weight as the predictor.
 allomModels <- allomModels %>% 
   filter(Y %notin% c("carbonWeight","dryWeight"))
 
 traits.calculated <- s.format
 for (i in c(1:nrow(allomModels))) {
-  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds
+  # The calculateFromModel function already excludes values with literature data and updates the traitTaxonIds,
   calc.now <- calculateFromModel(traits.lvl2.ed, allomModels[i,], trait.directory,
                                  excludeWithLit = TRUE, 
                                  applyToGeneralized = TRUE,
@@ -261,37 +265,54 @@ for (i in c(1:nrow(allomModels))) {
     bind_rows(calc.now) %>% 
     mutate(basisOfRecord = "calculated from regression")
 }
+
 # Filter only species of interest
 traits.calculated <- traits.calculated %>% 
   filter(taxonID %in% species.list$taxonID)
+
 # Update the overall working trait dataset
 traits.lvl2.ed <- bind_rows(traits.lvl2.ed, traits.calculated)
 ```
 
 ## Derive numerical traits
-For some traits (e.g., weight-specific rates or percent composition), values can be calculated using other trait information.
-```{r}
+For some traits (e.g., weight-specific rates or percent composition), values can be calculated using other trait information. Below are examples of functions for this.
+```{r, eval=FALSE}
+# Separate all numerical traits and set traitValue to numeric
+trait.num <- traits.lvl2 %>% 
+  filter(taxonID %in% species.list$taxonID) %>% 
+  filter(valueType == "numeric") %>% 
+  mutate(traitValue = as.numeric(traitValue))
+
+# Create a data frame of weights
+data.dryWeight <- traits.lvl2.ed %>% 
+  filter(traitName == "dryWeight") %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  mutate(sizeAssocReference = if_else(!is.na(secondaryReference),
+                                      secondaryReference, primaryReference)) %>% 
+  select(taxonID, sizeAssocName = traitName, sizeAssocValue = traitValue,
+         sizeAssocN = individualCount, sizeAssocSD = dispersionSD, sizeAssocReference)
+
+
+# Calculate percent or total composition when one value is known and a measure of weight.
+N1 <- convertTotal2PW(trait.num, data.dryWeight, "nitrogenPDW", "nitrogenTotal")
+N2 <- convertPW2Total(trait.num, data.dryWeight, "nitrogenTotal", "nitrogenPDW")
+
+# Calculate molar ratio of elements
+rCP <- calculateRatio(trait.num, "ratioCP", "carbonWeight", "phosphorusTotal")
+
+# Convert between individual-specific and weight-specific rates
+rate.Resp <- convertRateInd2WS(trait.num, data.dryWeight, "respirationRate_WSDW_15C",
+                             "respirationRate_15C", "ul O2 mg DW^-1 h^-1")
+rate.ExcN <- convertRateWS2Ind(trait.num, data.dryWeight,
+                               "excretionRateN_15C","excretionRateN_WSDW_15C",
+                               "ug N-NH4+ h^-1")
 ```
 
-## Evaluate and finalize
-```{r}
-# Regenerate the trait subset from the updated dataset
-trait.subset <- traits.lvl2.ed %>% 
-  filter(traitName %in% trait.list) %>% 
-  filter(taxonID %in% species.list$taxonID)
 
-# Evaluate progress of data gap estimation
-trait.subset %>% 
-  distinct(traitName, taxonID) %>% 
-  group_by(traitName) %>% 
-  summarise(Nrecords = n(), .groups = "drop") %>% 
-  mutate(Perc.sp = Nrecords / nrow(species.list) * 100)
-
-```
-
-# If estimating categorical traits
+# Estimating categorical traits
+## Method 1. Individually per species.
 This is one method for estimating the value of a categorical trait using the getGroupLevelValue() function. The script below searches if a categorical trait value is present in a taxonomic group. Note that this will only identify positive instances and will not provide the relative likelihood of how often a particular trait category appears in a group.
-```{r, warning=FALSE, eval=FALSE}
+```{r, warning=FALSE}
 # A. Trophic Group
 # For each categorical trait, find the binary versions
 cat.missing <- species.list %>% 
@@ -343,5 +364,56 @@ for (trait in binary.list) {
   }
 }
 
+# Update the overall working trait dataset
+traits.lvl2.ed <- bind_rows(traits.lvl2.ed, traits.generalized)
 ```
 
+## Method 2. Generalize entire groups and apply to missing species.
+This approach works with the binary version of categorical traits and gathers all values for each group in the chosen taxonomic level. If the species list is long, this is probably a faster calculation than method 1.
+
+In this example, we are generalizing at the family level for trophic group.
+```{r, eval=FALSE}
+cat.missing <- species.list %>% 
+  filter(taxonID %notin% filter(trait.subset, traitName == "trophicGroup")$taxonID)
+
+# Generalize trophic group at family level. 
+family.bin.tg <- traits.lvl2 %>% 
+  # Need to know the prefix of the binary trait.
+  filter(grepl("TG.",traitName)) %>% 
+  mutate(traitValue = as.numeric(traitValue)) %>% 
+  # TODO: Choose the taxonomic level
+  group_by(family, traitName) %>% 
+  # Collect all instances of a categorical level per group
+  summarise(traitValue = sum(traitValue),  
+            .groups = "drop") %>% 
+  group_by(family) %>% 
+  mutate(ntaxa = sum(traitValue)) %>% 
+  ungroup() %>% 
+  # convert to proportions
+  mutate(traitValue = traitValue / ntaxa)
+    
+missing.cat.tg.fam <- cat.missing %>% 
+  filter(traitName %in% c("trophicGroup")) %>% 
+  distinct(Species, family) %>% 
+  left_join(family.bin.tg, by = "family") %>% 
+  filter(!is.na(traitValue)) %>% 
+  select(-ntaxa) 
+
+```
+
+
+## Evaluate and finalize the species by traits table.
+```{r}
+# Regenerate the trait subset from the updated dataset
+trait.subset <- traits.lvl2.ed %>% 
+  filter(traitName %in% trait.list) %>% 
+  filter(taxonID %in% species.list$taxonID)
+
+# Evaluate progress of data gap estimation
+trait.subset %>% 
+  distinct(traitName, taxonID) %>% 
+  group_by(traitName) %>% 
+  summarise(Nrecords = n(), .groups = "drop") %>% 
+  mutate(Perc.sp = Nrecords / nrow(species.list) * 100)
+
+```

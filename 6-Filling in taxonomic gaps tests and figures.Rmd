@@ -25,6 +25,7 @@ packages <- c("tidyverse", "lubridate",
               "ggnewscale", # For having multiple color scales in ggplot
               "Rphylopars", # For phylogenetic imputation
               "cowplot",
+              "scales",
               "openxlsx")
 
 # Function to download the packages if necessary. Otherwise, these are loaded.
@@ -42,6 +43,11 @@ package.check <- lapply(
 )
 
 source("toolkit.R")
+
+scientific_10 <- function(x) {
+  xx <- parse(text=gsub("e", "%*%10^", scales::scientific_format()(x)))
+  xx <- parse(text=gsub("\\+","",xx))
+}
 
 theme_set(theme_bw())
 ```
@@ -65,7 +71,7 @@ lifestagelist <- read.csv("data_input/lifestage_directory_20230628.csv") %>%
 traits.lvl1 <- read.csv("data_input/Trait_dataset_level1/trait_dataset_level1-2023-08-15.csv")
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-08-15.csv")
+traits.lvl2 <- read.csv("data_input/Trait_dataset_level2/trait_dataset_level2-2023-09-14.csv")
 
 # Consider all species-level traits and get the phylogenetic tree for these species.
 load("data_input/phylo_tree_trait_level2_20230501.RData")
@@ -162,7 +168,8 @@ for(i in 1:nrow(model.calc)) {
 myplots <- vector("list",15)
 
 for(i in c(1:15)){
-  myplots[[i]] <-  ggplot(filter(traits.lvl2.sub, traitX == var.table[i,3] & traitY == var.table[i,4]),
+  myplots[[i]] <-  ggplot(filter(traits.lvl2.sub, traitX == var.table[i,3] & 
+                                   traitY == var.table[i,4]),
                           aes(x = traitXValue, y = traitYValue)) +
     geom_point(data = filter(traits.lvl1.sub, sizeAssocName == var.table[i,3] &
                                traitName == var.table[i,4]),
@@ -170,8 +177,19 @@ for(i in c(1:15)){
                shape = 4, size = 0.5, color = "gray80") +
     geom_point(alpha = 0.7, size = 3, aes(color = groupColor)) +
     scale_color_manual(values = c("lightblue","gray70","pink")) +
-    scale_x_continuous(labels = scaleFUN, trans = "log10") +
-    scale_y_continuous(labels = scaleFUN, trans = "log10") +
+    scale_y_continuous(trans = "log10", 
+                       labels = scales::trans_format("log10", math_format(10^.x)))
+  # For Figure 7b, set x-axis to just be multiples of 10
+  if (i != 2) {
+     myplots[[i]] <- myplots[[i]] +
+       scale_x_continuous(trans = "log10",
+                       labels = scales::trans_format("log10", math_format(10^.x)))
+  } else {
+     myplots[[i]] <- myplots[[i]] +
+       scale_x_continuous(trans = "log10", breaks = c(1,10,100),
+                       labels = scales::trans_format("log10", math_format(10^.x)))
+  }
+  myplots[[i]] <- myplots[[i]] +
     theme(legend.position = "none") +
     xlab(var.table$traitX[i]) + ylab(var.table$traitY[i]) +  
     ggnewscale::new_scale_colour() +
@@ -535,7 +553,6 @@ df.est.N <- res.impute %>%
   distinct(traitName, Nrecorded, fracRemoved, replicate,
            est.generalized.N, est.generalized.SE,
            est.allom.all.N, est.allom.crust.N, est.allom.gelat.N) %>% 
-  # TODO add from phylo reg
   pivot_longer(cols = c(est.generalized.N, est.allom.all.N, 
                         est.allom.crust.N, est.allom.gelat.N),
                names_to = "method", values_to = "estimate.N") %>% 
@@ -617,7 +634,7 @@ g1 <- ggplot(traitValue.comparison,
                color = method, linetype = method)) +
   # geom_point(size = 0.2) +
   geom_smooth(se = FALSE) +
-  scale_y_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10", labels = scientific_10) +
   scale_x_continuous(breaks = c(0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7),
                      labels = c(5,10,20,30,40,50,60,70)) +
   scale_color_manual(name = "Estimation method",
@@ -628,7 +645,8 @@ g1 <- ggplot(traitValue.comparison,
                                 "solid","twodash")) +             
   facet_wrap(~traitName, scales = "free_y", ncol = 2) +
   xlab("Percentage of species removed") +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "none",
+           panel.grid.minor.x = element_blank() ) +
   ggtitle("A. Crustacean species")
 # g1
 
@@ -732,12 +750,10 @@ g2 <- ggplot(traitValue.comparison.2,
                color = method, linetype = method)) +
   # geom_point(size = 0.2) +
   geom_smooth(se = FALSE) +
-  scale_y_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10", labels = scientific_10) +
   scale_x_continuous(breaks = c(0.05,0.1,0.2,0.3,0.4,0.5,0.6,0.7),
                      labels = c(5,10,20,30,40,50,60,70)) +
   scale_color_manual(name = "Estimation method",
-    # values = c("gray30","seagreen3","gold2","gold2",
-    #                           "skyblue","skyblue")) +
     values = c("gray30","seagreen3","gold2","gold2",
                               "pink","pink")) +
   scale_linetype_manual(name = "Estimation method",
@@ -745,19 +761,45 @@ g2 <- ggplot(traitValue.comparison.2,
                                 "solid","twodash")) +             
   facet_wrap(~traitName, scales = "free_y", ncol = 2) +
   xlab("Percentage of species removed") +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "none",
+           panel.grid.minor.x = element_blank() ) +
   ggtitle("B. Non-crustacean species")
-# g2
 
 
-# 3. Merge both figures into one
-fig <- plot_grid(g1, g2, nrow = 1)
-fig
+# 3. Create a temporary dataframe to create a common legend and then merge both figures.
+temp.df <- bind_rows(filter(traitValue.comparison, traitName == "dryWeight"),
+                     filter(traitValue.comparison.2, traitName == "wetWeight"))
+g3 <- ggplot(temp.df,
+       aes(x = fracRemoved, y = RMSE,
+               color = method, linetype = method)) +
+  geom_smooth(se = FALSE) +
+  scale_color_manual(name = "Estimation method",
+    values = c("gray30","seagreen3","gold2","gold2","skyblue","skyblue",
+                              "pink","pink")) +
+  scale_linetype_manual(name = "Estimation method",
+                     values = c("solid","solid","solid","twodash",
+                                "solid","twodash","solid","twodash")) +             
+  facet_wrap(~traitName, scales = "free_y", ncol = 2) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+g3
+  
+legend_b1 <- get_legend(
+  g3 + 
+    guides(color = guide_legend(nrow = 2)) 
+)
+
+plot_grid( plot_grid(g1, g2, nrow = 1), legend_b1, 
+           ncol = 1, rel_heights = c(1,0.1))
 
 ggsave("figures/fig_8_comparison_estimation_percent_removed.png",
-       width = 21, height = 23, units = "cm", dpi = 600)
-#TODO: manually anotate legend
+       width = 21, height = 23, units = "cm", dpi = 600, bg = "white")
 ```
+
+```{r}
+
+```
+
 
 # Supp Fig 3. Comparison of trait value estimation methods against number of species removed.
 ```{r}
@@ -767,7 +809,7 @@ g3 <- ggplot(traitValue.comparison,
                color = method, linetype = method)) +
   # geom_point(size = 0.2) +
   geom_smooth(se = FALSE) +
-  scale_y_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10", labels = scientific_10) +
   scale_color_manual(name = "Estimation method",
     values = c("gray30","seagreen3","gold2","gold2",
                               "skyblue","skyblue")) +
@@ -776,7 +818,8 @@ g3 <- ggplot(traitValue.comparison,
                                 "solid","twodash")) +             
   facet_wrap(~traitName, scales = "free", ncol = 2) +
   xlab("Number of species removed") +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "none",
+           panel.grid.minor.x = element_blank() ) +
   ggtitle("A. Crustacean species")
 g3
 
@@ -787,7 +830,7 @@ g4 <- ggplot(traitValue.comparison.2,
                color = method, linetype = method)) +
   # geom_point(size = 0.2) +
   geom_smooth(se = FALSE) +
-  scale_y_continuous(trans = "log10") +
+  scale_y_continuous(trans = "log10", labels = scientific_10) +
   scale_color_manual(name = "Estimation method",
     # values = c("gray30","seagreen3","gold2","gold2",
     #                           "skyblue","skyblue")) +
@@ -798,15 +841,16 @@ g4 <- ggplot(traitValue.comparison.2,
                                 "solid","twodash")) +             
   facet_wrap(~traitName, scales = "free", ncol = 2) +
   xlab("Number of species removed") +
-  theme(legend.position = "bottom") +
+  theme(legend.position = "none",
+           panel.grid.minor.x = element_blank() ) +
   ggtitle("B. Non-crustacean species")
 g4
 
 
-fig <- plot_grid(g3, g4, nrow = 1)
-fig
+plot_grid( plot_grid(g3, g4, nrow = 1), legend_b1, 
+           ncol = 1, rel_heights = c(1,0.1))
+
 ggsave("figures/supp_fig_3_comparison_estimation_nspecies_removed.png",
-       width = 21, height = 23, units = "cm", dpi = 600)
-# TODO: manually anotate legend
+       width = 21, height = 23, units = "cm", dpi = 600, bg = "white")
 ```
 

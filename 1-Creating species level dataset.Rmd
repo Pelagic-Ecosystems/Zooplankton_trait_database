@@ -633,7 +633,7 @@ traits.lvl2 <- traits.lvl2 %>%
 ```{r, eval=FALSE}
 # write.csv(traits.lvl2,
 #           file = paste0(outfol,"trait_dataset_level2-",
-#                    ymd(Sys.Date()),".csv"), 
+#                    ymd(Sys.Date()),".csv"),
 #           row.names = FALSE)
 # write.csv(traits.lvl2.excluded,
 #           file = paste0(outfol,"trait_dataset_level2_excluded-",

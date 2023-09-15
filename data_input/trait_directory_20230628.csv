@@ -322,3 +322,5 @@ life history,41,development duration,160,developmentRate_15C,day^-1,Development.
 life history,42,life span,161,lifeSpan,day,lifeSpan_Mean,day,numeric
 life history,42,life span,162,lifeSpan_Max,day,lifeSpan_Max,day,numeric
 life history,42,life span,163,lifeSpan_Min,day,lifeSpan_Min,day,numeric
+physiological,27,excretion rate N,192,excretionRateN_WSC_15C,ug N-NH4+ mg C^-1 h^-1,,,numeric
+physiological,28,excretion rate P,194,excretionRateP_WSC_15C,ug P-PO43- mg C^-1 h^-1,,,numeric

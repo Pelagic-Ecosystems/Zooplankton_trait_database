@@ -59,7 +59,7 @@ infol <- "data_input/Trait_dataset_level2/"
 outfol <- "data_input/Trait_dataset_level3/"
 
 # Load Level 2 dataset
-traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-08-15.csv"))
+traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-09-14.csv"))
 
 # Consider all species-level traits and get the phylogenetic tree for these species.
 load("data_input/phylo_tree_trait_level2_20230501.RData")
