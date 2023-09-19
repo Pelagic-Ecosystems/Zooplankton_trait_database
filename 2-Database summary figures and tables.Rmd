@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 packages <- c("tidyverse", "lubridate", 
               "scales",
+              "ggtext",
               "ggbreak", # For figure 3 breaks, cite: 10.3389/fgene.2021.774846.
               "cowplot") 
 
@@ -155,8 +156,9 @@ bplot <- ggplot(trait.sum, aes(x = traitName, y = Nsp.mg,
         legend.background = element_rect(fill = "white", colour = NA)) 
 bplot 
 
-ggsave(filename = "figures/fig_3_coverage_barplot_species.png",
-    width = 32, height=37, units = "cm", dpi = 300)
+ggsave(filename = "figures/fig_3_coverage_barplot_species.tiff",
+    width = 32, height=35, units = "cm", dpi = 600, 
+    device = "tiff", compression = "lzw")
 ```
 
 
@@ -334,12 +336,17 @@ j4 <- ggplot(filter(B, traitName == "respirationRate_WSC_15C"),
   scale_x_discrete(breaks = A$class) +
   theme_bw() +
   scale_fill_continuous("N species", type = "viridis", trans = "log10") +
-  ylab("Respiration rate \n(ul O2 mg C^-1 h^-1)") + xlab("Class") +
+  # ylab(expression(Respiration rate \n(ul O[2] mg C^-^1 h^-^1))) + 
+  ylab("Respiration rate<br>(\u03bcl O<sub>2</sub> mg C<sup>-1</sub> h<sup>-1</sup>)") +
+  # ylab(expression(paste("Respiration rate ", "(", 
+  #                       mu,'l ', O[2], ' mg ', C^{-1},' ', h^{-1}, ")"))) + 
+  xlab("Class") +
   theme(axis.text.x = element_text(angle = 45,  hjust=1, size = 12),
         legend.position = "right",
         legend.justification = c(0,1),
         legend.margin=margin(0,0,0,0),
-        legend.box.margin=margin(0,0,0,-10)) 
+        legend.box.margin=margin(0,0,0,-10),
+        axis.title.y = element_markdown()) 
 
 
 J <- plot_grid(j1, j2, j3, j4,
@@ -481,8 +488,9 @@ fig <- plot_grid(J, H, nrow = 1, rel_widths = c(1,1.1))
 
 fig
 
-ggsave(filename = "figures/fig_5_trait_distributions.png",
-    width = 24.75, height=30, units = "cm", dpi = 300)
+ggsave(filename = "figures/fig_5_trait_distributions.tiff",
+    width = 24.75, height=26, units = "cm",  dpi = 600, 
+    device = "tiff", compression = "lzw")
 ```
 
 
@@ -524,6 +532,7 @@ ggplot(filter(C2, numeric > 0),
   scale_x_continuous(trans = "log10") +
   theme_bw()
 
-ggsave("figures/supp_fig_2_bias_numtraits_size.png",
-       width = 7.5, height = 3, units = "in", dpi = 300)
+ggsave("figures/supp_fig_2_bias_numtraits_size.tiff",
+       width = 7, height = 3, units = "in",  dpi = 600, 
+    device = "tiff", compression = "lzw")
 ```

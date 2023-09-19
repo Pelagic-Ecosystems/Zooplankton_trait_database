@@ -341,8 +341,8 @@ cor.table.2 <- cor.table %>%
   group_by(analysis) %>% 
   filter(row_number() == 1) %>% 
   ungroup() %>% 
-# How many correlation coefficients >0.50 and N.pairs > 100
-  mutate(r.mag = if_else(abs(r.phylo) > 0.5 & N.pairs >= 0,
+# How many correlation coefficients >0.50 
+  mutate(r.mag = if_else(abs(r.phylo) > 0.5,
          "s","w")) %>% 
   mutate(N.species = N.pairs)
   
@@ -577,8 +577,9 @@ cowplot::ggdraw() +
   draw_plot(g1) +
   draw_plot(g2, x = 0.61, y = .645, width = 0.325, height = 0.4)
   
-ggsave("figures/fig_6_association_between_traits.png",
-       width = 14, height = 13, units = "in", dpi = 600)
+ggsave("figures/fig_6_association_between_traits.tiff",
+       width = 14, height = 13, units = "in", dpi = 900, 
+    device = "tiff", compression = "lzw")
 ```
 ```{r}
 

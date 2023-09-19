@@ -195,7 +195,7 @@ for(i in c(1:15)){
     ggnewscale::new_scale_colour() +
     geom_line(data = filter(df.reg, X == var.table[i,3] & Y == var.table[i,4]),
               aes(x = trait.x, y = trait.y, color = group, linetype = model),
-              linewidth = 1, alpha = 0.8) +
+              linewidth = 1, alpha = 0.6) +
     scale_color_manual(values = c("darkblue","hotpink")) +
     labs(color = "model group", linetype = "model")
 }
@@ -203,8 +203,9 @@ for(i in c(1:15)){
 plot_grid(plotlist = myplots, ncol = 3,
           labels = "AUTO")
 
-ggsave(filename="figures/fig_7_allometric_scaling.png",
-    width=24.75, height=30, units = "cm", dpi = 300)
+ggsave(filename="figures/fig_7_allometric_scaling.tiff",
+    width=24.75, height=29, units = "cm",  dpi = 600, 
+    device = "tiff", compression = "lzw")
 
 ```
 
@@ -792,12 +793,9 @@ legend_b1 <- get_legend(
 plot_grid( plot_grid(g1, g2, nrow = 1), legend_b1, 
            ncol = 1, rel_heights = c(1,0.1))
 
-ggsave("figures/fig_8_comparison_estimation_percent_removed.png",
-       width = 21, height = 23, units = "cm", dpi = 600, bg = "white")
-```
-
-```{r}
-
+ggsave("figures/fig_8_comparison_estimation_percent_removed.tiff",
+       width = 21, height = 22, units = "cm", dpi = 600, bg = "white",
+    device = "tiff", compression = "lzw")
 ```
 
 
@@ -850,7 +848,8 @@ g4
 plot_grid( plot_grid(g3, g4, nrow = 1), legend_b1, 
            ncol = 1, rel_heights = c(1,0.1))
 
-ggsave("figures/supp_fig_3_comparison_estimation_nspecies_removed.png",
-       width = 21, height = 23, units = "cm", dpi = 600, bg = "white")
+ggsave("figures/supp_fig_3_comparison_estimation_nspecies_removed.tiff",
+       width = 21, height = 22, units = "cm", dpi = 600, bg = "white",
+    device = "tiff", compression = "lzw")
 ```
 

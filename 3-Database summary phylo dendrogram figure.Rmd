@@ -113,8 +113,9 @@ ggplot(taxon.count.sum, aes(ntraits, ntaxa)) +
   scale_x_continuous("Number of traits per species",
                      breaks = c(0,10,20,30,40,50,60))
 
-ggsave(filename = "figures/supp_fig_1_num_traits_by_species.png",
-    width = 7, height=3, units = "in", dpi = 300)
+ggsave(filename = "figures/supp_fig_1_num_traits_by_species.tiff",
+    width = 7, height=3, units = "in", dpi = 600, 
+    device = "tiff", compression = "lzw")
 ```
 
 # For Figure 4. Summary of level 2 data coverage as the number of trait records per species.
