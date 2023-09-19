@@ -201,7 +201,7 @@ for(i in c(1:15)){
 }
 
 plot_grid(plotlist = myplots, ncol = 3,
-          labels = "AUTO")
+          labels = "auto")
 
 ggsave(filename="figures/fig_7_allometric_scaling.tiff",
     width=24.75, height=29, units = "cm",  dpi = 600, 
@@ -648,7 +648,7 @@ g1 <- ggplot(traitValue.comparison,
   xlab("Percentage of species removed") +
   theme(legend.position = "none",
            panel.grid.minor.x = element_blank() ) +
-  ggtitle("A. Crustacean species")
+  ggtitle("a. Crustacean species")
 # g1
 
 
@@ -764,7 +764,7 @@ g2 <- ggplot(traitValue.comparison.2,
   xlab("Percentage of species removed") +
   theme(legend.position = "none",
            panel.grid.minor.x = element_blank() ) +
-  ggtitle("B. Non-crustacean species")
+  ggtitle("b. Non-crustacean species")
 
 
 # 3. Create a temporary dataframe to create a common legend and then merge both figures.
@@ -818,7 +818,7 @@ g3 <- ggplot(traitValue.comparison,
   xlab("Number of species removed") +
   theme(legend.position = "none",
            panel.grid.minor.x = element_blank() ) +
-  ggtitle("A. Crustacean species")
+  ggtitle("a. Crustacean species")
 g3
 
 
@@ -841,7 +841,7 @@ g4 <- ggplot(traitValue.comparison.2,
   xlab("Number of species removed") +
   theme(legend.position = "none",
            panel.grid.minor.x = element_blank() ) +
-  ggtitle("B. Non-crustacean species")
+  ggtitle("b. Non-crustacean species")
 g4
 
 

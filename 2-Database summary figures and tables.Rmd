@@ -337,7 +337,7 @@ j4 <- ggplot(filter(B, traitName == "respirationRate_WSC_15C"),
   theme_bw() +
   scale_fill_continuous("N species", type = "viridis", trans = "log10") +
   # ylab(expression(Respiration rate \n(ul O[2] mg C^-^1 h^-^1))) + 
-  ylab("Respiration rate<br>(\u03bcl O<sub>2</sub> mg C<sup>-1</sub> h<sup>-1</sup>)") +
+  ylab("Respiration rate<br>(\u03bcl O<sub>2</sub> mg C<sup>-1</sup> h<sup>-1</sup>)") +
   # ylab(expression(paste("Respiration rate ", "(", 
   #                       mu,'l ', O[2], ' mg ', C^{-1},' ', h^{-1}, ")"))) + 
   xlab("Class") +
@@ -351,7 +351,7 @@ j4 <- ggplot(filter(B, traitName == "respirationRate_WSC_15C"),
 
 J <- plot_grid(j1, j2, j3, j4,
                ncol = 1, align = "v", rel_heights = c(1,1,1,1.6),
-               labels = c("A","B","C","D"))
+               labels = c("a","b","c","d"))
 
 # Distribution of some common categorical traits
 cat.traits <- traits.lvl2 %>% 
@@ -480,7 +480,7 @@ h4 <- ggplot(trophic.group,
 
 H <- plot_grid(h1, h2, h3, h4, 
                ncol = 1, align = "v", rel_heights = c(1,1,1,1.6),
-               labels = c("E","F","G","H"))
+               labels = c("e","f","g","h"))
 
 
 # Merge summaries into a single figure
