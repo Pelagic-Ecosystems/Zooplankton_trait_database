@@ -23,7 +23,7 @@ packages <- c("tidyverse", "lubridate",
               "lmodel2", # For option of type 2 regressions such as RMA
               "phylolm", # For linear models accounting for phylogenetic effects
               "ggnewscale", # For having multiple color scales in ggplot
-              "Rphylopars", # For phylogenetic imputation
+              # "Rphylopars", # For phylogenetic imputation
               "cowplot",
               "scales",
               "openxlsx")
@@ -447,6 +447,8 @@ traitImputations <- function(sp.to.predict, all.traits, tested.trait,
 
 ## Big loop of estimation accuracy analysis
 This does 100 iterations of trait removal from 5% to 70% species removed in 5% intervals. The phylopar analysis will only have body length and the weight trait that matches the allometric scaling equation. Further increasing the number of traits or including all traits when doing the phylopar analysis not only slows down the computation time but also results in less accurate estimates, likely because of overfitting.
+
+*NOTE* By default this chunk does not run because it may take a long time for it to finish computing. If you wish to explore using this chunk, you need to download the `Rphylopars` package and load it (which is currently commented out in line 26).
 ```{r, warning=FALSE, eval=FALSE}
 # Prepare phylo tree and make sure tree tip names match the scientific names
 phylo.table <- tree.tips %>% 

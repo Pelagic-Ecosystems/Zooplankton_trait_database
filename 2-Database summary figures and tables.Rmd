@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 packages <- c("tidyverse", "lubridate", 
               "scales",
               "ggtext",
-              "ggbreak", # For figure 3 breaks, cite: 10.3389/fgene.2021.774846.
+              # "ggbreak", # For figure 3 breaks, cite: 10.3389/fgene.2021.774846.
               "cowplot") 
 
 # Function to download the packages if necessary. Otherwise, these are loaded.
@@ -76,7 +76,10 @@ traits.lvl2 <- read.csv(paste0(infol,"trait_dataset_level2-2023-09-14.csv"))
 
 # Figure 3. Summary of level 2 data coverage as the number of species records per trait by major group. 
 Only traits recorded at the species level were enumerated.
-```{r, fig.height=4, fig.width=3}
+
+*NOTE* The script below does not produce the figure with the axis breaks as seen in the manuscript. If you wish to add the axis break, please download the `ggbreak` package (but be careful in its requirements and dependencies for your version of R). If ggbreak is present, uncomment line 142: `scale_y_break(breaks = c(1250,2900), expand = FALSE) +`.
+
+```{r, fig.height=4, fig.width=3, eval=TRUE}
 
 # Assign colors to major groups
 majorgroup.colors <- data.frame(
@@ -137,7 +140,7 @@ bplot <- ggplot(trait.sum, aes(x = traitName, y = Nsp.mg,
   # Set axis break
   scale_y_continuous(breaks = c(0, 250, 500, 750, 1000, 3000),
                      limits = c(0, 3180)) +
-  scale_y_break(breaks = c(1250,2900), expand = FALSE) +
+  # scale_y_break(breaks = c(1250,2900), expand = FALSE) +
   # Add number at end of bar
   geom_text(aes(label = after_stat(y), group = traitName),
             stat = "summary", fun = sum, hjust = -0.1,
@@ -156,7 +159,7 @@ bplot <- ggplot(trait.sum, aes(x = traitName, y = Nsp.mg,
         legend.background = element_rect(fill = "white", colour = NA)) 
 bplot 
 
-ggsave(filename = "figures/fig_3_coverage_barplot_species.tiff",
+ggsave(filename = "figures/fig_3_coverage_barplot_species_v2.tiff",
     width = 32, height=35, units = "cm", dpi = 600, 
     device = "tiff", compression = "lzw")
 ```
@@ -217,7 +220,7 @@ bplot <- ggplot(trait.sum, aes(x = trait, y = Nsp.mg,
   # Set axis break
   scale_y_continuous(breaks = c(0, 250, 500, 750, 1000, 3000),
                      limits = c(0, 3180)) +
-  scale_y_break(breaks = c(1250,2980), expand = FALSE) +
+  # scale_y_break(breaks = c(1250,2980), expand = FALSE) +
   # Add number at end of bar
   geom_text(aes(label = after_stat(y), group = trait),
             stat = "summary", fun = sum, hjust = -0.1,
