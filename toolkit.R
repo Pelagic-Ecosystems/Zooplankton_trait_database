@@ -999,9 +999,9 @@ calculateFromModel <- function(df, model, trait.directory, excludeWithLit = TRUE
               aggregateMeasure, isDerived, catalogSource, basisOfRecordDescription)) %>%  
     filter(str_detect(group, model$grp),
            traitName %in% model$X) %>% 
+    mutate(traitValue = as.numeric(traitValue)) %>% 
     filter(traitValue >= model$minX,
-           traitValue <= model$maxX) %>% 
-    mutate(traitValue = as.numeric(traitValue))
+           traitValue <= model$maxX) 
   
   # If the predictor is size trait, assign it as sizeAssoc
   if (model$X %in% c("bodyLengthMax", "carbonWeight", "dryWeight", "wetWeight")){
