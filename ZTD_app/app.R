@@ -1,3 +1,19 @@
+# Trait database curation shiny app
+# Created by: P. Pata
+# Last updated: February 27, 2024
+# 
+# This app explores the contents of the global zooplankton trait database. It provides some basic options to filter the contents of the dataset. The number of data points (by species) is displayed in a figure and a direct download button is provided.
+
+
+# # To download package
+# install.packages("remotes")
+# remotes::install_github("rstudio/shinyuieditor")
+# # To edit and run shiny app
+# shinyuieditor::launch_editor(app_loc = here::here("ZTD_app/"))
+# shiny::runApp("ZTD_app")
+
+
+
 library(shiny)
 library(plotly)
 library(gridlayout)
