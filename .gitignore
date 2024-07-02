@@ -5,3 +5,5 @@
 figures/
 scratch_codes.R
 ZPS7_W05_database_exploration.Rmd
+ZTD_app/
+shiny_app.R
