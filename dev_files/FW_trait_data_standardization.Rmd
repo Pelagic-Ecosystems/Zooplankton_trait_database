@@ -1,0 +1,381 @@
+---
+title: "FW Trait Data Standardization"
+author: "Patrick Pata"
+date: "2025-09-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Hebert et al 2016 Zoop data - FW portion
+2. Beisner Functional Trait Matrix
+3. Obertegger et al 2023
+4. Colina et al 2016
+5. Barnett 2007_2013
+
+Note: Later, need a WoRMS Taxonomy table for all taxa names
+
+# Load packages and functions
+```{r}
+library(tidyverse)
+source("../toolkit.R")
+
+# The base format of the trait database data frame.
+s.format <- read.csv(here("data_input/trait_dataset_standard_format_20230628.csv"))[-1,]
+
+
+getref <- function(refval = NA, refs.list = refs) {
+  # If multiple vals seperated by comma, separate
+  rfs <- as.numeric(unlist(str_split(refval, ",")))
+  # Extract from the refs list
+  ref.sub <- refs.list %>% 
+    filter(Ref.code %in% rfs) 
+  df <- paste0(ref.sub$ref_id, collapse = "; ")
+  return(df)
+}
+```
+
+# Read data
+## Hebert et al. 2016 - Freshwater
+- Note that Macrosetella sp. has no habitat type so excluded in previous curation
+```{r}
+# Original file
+f <- here("dev_files/literature_data/Hebert2016/zooplankton_traits.csv")
+
+data <- read.csv2(f, sep = ";", dec = ",") %>% 
+  filter(Habitat == "Freshwater")
+
+# reference table
+refs <- read.csv(here("dev_files/literature_data/Hebert2016/references_ed.csv"))
+
+
+# Replace non numeric rows to numeric and , to .
+data.class <- unlist( lapply(data, class) ) %>% 
+  as.data.frame() %>% 
+  rename(Class = ".") %>% 
+  rownames_to_column("ColumnName") %>% 
+  filter(Class == "character")
+
+# The rest of the coercion warning are when the values are "RT" or "nd " (room temperature and not detectable)
+data <- data %>% 
+  # mutate(Replicate.number = as.numeric(Replicate.number)) %>% # Also References?
+  mutate(Min.dm = as.numeric(str_replace(str_replace(Min.dm," ",""),",","."))) %>%
+  mutate(Min.lip = as.numeric(str_replace(str_replace(Min.lip," ",""),",","."))) %>% 
+  mutate(Temp.resp.rt = as.numeric(str_replace(str_replace(Temp.resp.rt," ",""),",","."))) %>%
+  mutate(Min.Nex.rt.ug.dm = as.numeric(str_replace(str_replace(Min.Nex.rt.ug.dm," ",""),",","."))) %>% 
+  mutate(Temp.Nex.rt = as.numeric(str_replace(str_replace(Temp.Nex.rt," ",""),",","."))) %>%
+  mutate(P.phosphate.ex.rt.ug.ind = as.numeric(str_replace(str_replace(P.phosphate.ex.rt.ug.ind," ",""),",","."))) %>%
+  mutate(Temp.Pex.rt = as.numeric(str_replace(str_replace(Temp.Pex.rt," ",""),",","."))) %>%
+  mutate(Min.NP.ex = as.numeric(str_replace(str_replace(Min.NP.ex," ",""),",",".")))
+
+# For each trait, expand to long format, separate column for references and add unit column
+heb.tg <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Trophic.group, Ref.tg) %>% 
+  filter(!is.na(Trophic.group)) %>% 
+  rename(verbatimTraitValue = Trophic.group,
+         observationNumber = Replicate.number) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         verbatimTraitName = "Trophic.group",
+         secondaryReference = "Hebert2016") %>% 
+    group_by(Ref.tg) %>% 
+  mutate(primaryReference = getref(Ref.tg)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species)
+  # TODO recode trait value?
+
+heb.bl <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Body.length, Min.bl, Max.bl, Ref.bl) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Body.length, Min.bl, Max.bl),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.bl) %>% 
+  mutate(primaryReference = getref(Ref.bl)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "mm")
+  
+
+heb.dm <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Dry.mass, Min.dm, Max.dm, Ref.dm) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Dry.mass, Min.dm, Max.dm),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.dm) %>% 
+  mutate(primaryReference = getref(Ref.dm)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "mg")
+
+heb.C <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Cct.prop, Min.Cprop, Max.Cprop, Cct.total, Ref.C) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Cct.prop, Min.Cprop, Max.Cprop, Cct.total),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.C) %>% 
+  mutate(primaryReference = getref(Ref.C)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "%") %>% 
+  mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Cct.total",
+                                     "mg", verbatimTraitUnit))
+
+heb.N <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Nct.prop, Min.Nprop, Max.Nprop, Nct.total, Ref.N) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Nct.prop, Min.Nprop, Max.Nprop, Nct.total),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.N) %>% 
+  mutate(primaryReference = getref(Ref.N)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "%") %>% 
+  mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Nct.total",
+                                     "mg", verbatimTraitUnit))
+
+
+heb.P <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Pct.prop, Min.Pprop, Max.Pprop, Pct.total, Ref.P) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Pct.prop, Min.Pprop, Max.Pprop, Pct.total),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.P) %>% 
+  mutate(primaryReference = getref(Ref.P)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "%") %>% 
+  mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Pct.total",
+                                     "mg", verbatimTraitUnit))
+
+heb.NP <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           N.Pct, Min.NP, Max.NP, Ref.NP) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(N.Pct, Min.NP, Max.NP),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.NP) %>% 
+  mutate(primaryReference = getref(Ref.NP)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) 
+
+heb.prot <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Protein.ct, Min.prot, Max.prot, Ref.prot) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Protein.ct, Min.prot, Max.prot),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.prot) %>% 
+  mutate(primaryReference = getref(Ref.prot)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "%")
+
+heb.lip <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Lipid.ct, Min.lip, Max.lip, Ref.lip) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(Lipid.ct, Min.lip, Max.lip),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.lip) %>% 
+  mutate(primaryReference = getref(Ref.lip)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species) %>% 
+  mutate(verbatimTraitUnit = "%")
+
+# respiration ++
+
+heb.resp <- data %>% 
+  distinct(Group, Genus, Species, Replicate.number,
+           Respiration.rt.ind, Respiration.rt.mg, Min.resp.mg, Max.resp.mg,
+           Temp.resp.rt, Min.temp.resp.rt, Max.temp.resp.rt, Ref.resp) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  select(where(~!all(is.na(.x)))) %>%  # remove rows with all NAs
+  filter(!is.na(Ref.resp)) %>% 
+  rename(verbatimTraitValue = Respiration.rt.ind,
+         verbatimTemperature = Temp.resp.rt) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         verbatimTraitName = "Respiration.rt.ind",
+         verbatimTraitUnit = "µl O2 ind-1 h-1",
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.resp) %>% 
+  mutate(primaryReference = getref(Ref.resp)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         verbatimTemperature, verbatimTraitUnit,
+         secondaryReference, primaryReference, observationNumber,
+         Group, Genus, Species)
+
+
+heb.Nex <- data %>% 
+  select(Group, Genus, Species, Replicate.number,
+           N.ammonia.ex.rt.ug.ind:Ref.N.ex) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(N.ammonia.ex.rt.ug.ind:Max.Nex.rt.nmol.ind),
+           names_to = "verbatimTraitName",
+           values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  pivot_longer(cols = c(Temp.Nex.rt, Min.temp.Nex.rt, Max.temp.Nex.rt),
+               names_to = "notes",
+               values_to = "verbatimTemperature") %>% 
+  filter(!is.na(verbatimTemperature)) %>% 
+  # Verbatim temperature can be mid point of the min-max values?
+  mutate(notes = paste("Temperature variable is", notes)) %>% 
+  
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016",
+         verbatimTraitUnit = "") %>% 
+  mutate(verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.ind") == TRUE,
+                                     "µg N-NH4+ ind-1 h-1", verbatimTraitUnit),
+         verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.dm") == TRUE,
+                                     "µg N-NH4+ mgDM-1 h-1", verbatimTraitUnit)
+         ) %>% 
+  group_by(Ref.N.ex) %>% 
+  mutate(primaryReference = getref(Ref.N.ex)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         verbatimTemperature, verbatimTraitUnit,
+         secondaryReference, primaryReference, observationNumber, notes,
+         Group, Genus, Species)
+
+
+
+heb.Pex <- data %>% 
+  select(Group, Genus, Species, Replicate.number,
+           P.phosphate.ex.rt.ug.ind:Ref.P.ex) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(P.phosphate.ex.rt.ug.ind:Max.Pex.rt.nmol.ind),
+           names_to = "verbatimTraitName",
+           values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  pivot_longer(cols = c(Temp.Pex.rt, Min.temp.Pex.rt, Max.temp.Pex.rt),
+               names_to = "notes",
+               values_to = "verbatimTemperature") %>% 
+  filter(!is.na(verbatimTemperature)) %>% 
+  # Verbatim temperature can be mid point of the min-max values?
+  mutate(notes = paste("Temperature variable is", notes)) %>% 
+  
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016",
+         verbatimTraitUnit = "") %>% 
+  mutate(verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.ind") == TRUE,
+                                     "µg P-PO43- ind-1 h-1", verbatimTraitUnit),
+         verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.dm") == TRUE,
+                                     "µg P-PO43- mgDM-1 h-1", verbatimTraitUnit)
+         ) %>% 
+  group_by(Ref.P.ex) %>% 
+  mutate(primaryReference = getref(Ref.P.ex)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         verbatimTemperature, verbatimTraitUnit,
+         secondaryReference, primaryReference, observationNumber, notes,
+         Group, Genus, Species)
+
+
+heb.NPex <- data %>% 
+  select(Group, Genus, Species, Replicate.number,
+           N.P.ex:Ref.NPex) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(N.P.ex, Min.NP.ex, Max.NP.ex),
+           names_to = "verbatimTraitName",
+           values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.NPex) %>% 
+  mutate(primaryReference = getref(Ref.NPex)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber, 
+         Group, Genus, Species)
+
+
+# Determine the associate size value?
+dm.sub <- heb.dm %>% 
+  select(verbatimScientificName, observationNumber,
+         sizeAssocName = verbatimTraitName,
+         sizeAssocValue = verbatimTraitValue,
+         sizeAssocUnit = verbatimTraitUnit,
+         sizeAssocReference = primaryReference)
+
+# TODO calculate the mid point fo size to prevent many-to-many left joins in Pex
+# TODO maybe do this for the combined data frame so that elemental composition have values too
+# Combine all rows
+heb.long <- bind_rows(heb.C, heb.N, heb.P, heb.NP,
+                      heb.lip, heb.prot,
+                      heb.resp, heb.Nex, heb.Pex, heb.NPex) %>% 
+  # Add size associated values for physiology and composition traits
+  left_join(dm.sub,
+            by = join_by(verbatimScientificName, observationNumber)) %>% 
+  # Add the size traits
+  bind_rows(heb.bl, heb.dm)
+
+# NOTE that because heb.tg is categorical, separate if for now before unit conversions of the numerical traits
+heb.long.tg <- heb.tg
+
+rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
+   heb.resp, heb.Nex, heb.Pex, heb.NPex,
+   dm.sub,heb.bl, heb.dm, )
+```
+
+## 
+```{r}
+
+```
+
