@@ -374,8 +374,86 @@ rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
    dm.sub,heb.bl, heb.dm, )
 ```
 
-## 
+## Beisner trait matrix
+*NEED TO CONFIRM PRIMARY REFERENCES*
+- Also need to confirm if the sample column is just for specific study (For 8 species listed as both Sample = Pelagic and Sediment, the size value is the same, for 12 species, size is different)
+- Note that some taxa names are "calanoid/cyclopoid copepodite"
+```{r}
+f <- here("dev_files/literature_data/Fresh water zooplankton traits - from B Beisner/Functionaltraitsmatrix.csv")
+
+beisner.long <- read.csv(f) %>% 
+# Change . in species name
+  mutate(verbatimScientificName = Species.name) %>% 
+  mutate(Species.name = str_trim(str_replace_all(Species.name,"\\."," "))) %>% 
+# Convert to long format
+  mutate(mean.length_mm = as.character(mean.length_mm)) %>% 
+  pivot_longer(cols = c(mean.length_mm, feeding.type, habitat, trophic.group),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  mutate(verbatimTraitUnit = if_else(verbatimTraitName == "mean.length_mm",
+                                     "mm", NA),
+         secondaryReference = "BeisnerData") %>% 
+  # Remove instances when records are duplicated because there were sepearate rows for Sample = Pelagic/Sediment. For 12 species, the size trait is different between samples
+  group_by(verbatimScientificName, verbatimTraitName, verbatimTraitValue) %>% 
+  filter(row_number() == 1) %>% 
+  mutate(notes = paste("Sample =", Sample)) %>% 
+  select(-Sample)
+```
+
+## Colina et al. 2016
+The appendix.csv and references.csv are the spreadsheet version of the supplementary word file. The references column was manually annotated to fix typos and change special characters.
+- Note: clearance (CR, mL.ind-1 d-1) and ingestion rates (IR, ugC.ind-1.d-1), phytoplankton initial concentration (C0, mgC.L-1), MBFG affiliation of the phytoplankton, and references.
+
+MBFG	Description
+I	Small organisms with high sruface/volume
+II	Small-flagellated organisms with silicieous exoskeletal structures
+III	Large filaments with aerotopes
+IV	Organisms of medium size lacking specialized traits
+V	Unicellular flagellates of medium to large size
+VI	Non-flagellated organisms with siliceous exoskeletons
+VII	Large mucilaginous colonies
+
+```{r}
+data <- read.csv(
+  here("dev_files/literature_data/Colina 2016/Colina2016_supplementary_appendix.csv"))
+refs <- read.csv(
+  here("dev_files/literature_data/Colina 2016/Colina2016_references.csv"))
+mbfg <- read.csv(
+   here("dev_files/literature_data/Colina 2016/MBFG_table.csv"))
+
+colina.long <- data %>% 
+# rename columns and assign units
+  rename(verbatimScientificName = Zooplankton.species) %>% 
+  pivot_longer(cols = c("CR..mL.ind.1.d.1.","IR..ugC.ind.1.d.1."),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  mutate(verbatimTraitUnit = if_else(
+    verbatimTraitName == "CR..mL.ind.1.d.1.", 
+    "mL ind-1 d-1", "ugC ind-1 d-1")) %>% 
+# reassign MBFG descriptions and phyto concentration to notes
+  left_join(mbfg, by = "MBFG") %>% 
+  mutate(notes = paste("Phytoplankton initial concentration C0 =",
+                       C0..mgC.L.1., "mg C L-1; Prey type =", MBFG_descriptor)) %>% 
+# reassign references
+  left_join(refs %>% select(primaryReference, Reference_ed = Reference),
+            by = "Reference_ed") %>% 
+  mutate(secondaryReference = "Colina2016") %>% 
+  select(-c(Reference, Reference_ed, C0..mgC.L.1., MBFG, MBFG_descriptor)) %>% 
+  # remove blanks in trait value
+  mutate(verbatimTraitValue = as.numeric(verbatimTraitValue)) %>% 
+  filter(!is.na(verbatimTraitValue))
+
+```
+
+TODO:
+## Obertegger and Wallace 2023 Rotifers 
 ```{r}
 
 ```
+
+## Barnett et al 2007 FW zooplankton
+```{r}
+
+```
+
 
