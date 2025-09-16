@@ -20,6 +20,7 @@ Note: Later, need a WoRMS Taxonomy table for all taxa names
 # Load packages and functions
 ```{r}
 library(tidyverse)
+library(here)
 source("../toolkit.R")
 
 # The base format of the trait database data frame.
@@ -447,8 +448,56 @@ colina.long <- data %>%
 
 TODO:
 ## Obertegger and Wallace 2023 Rotifers 
+- Traits at genus level
+- Feeding traits were from specific references except some feeding trait values that were filled in based on literature. These were only marked by color in the spreadsheet so these needed to be manually organized to long format.
+- Note that for the column headers that cite references as sensu/after CITATION, these references are not in the provided list and it is unclear if the values assigned colored in black were based on these references or the reference was just used for the terminology. For now, consider these as the primary reference but need to check the individual sources later.
+- Although sometimes there are references in the column "literature to fill missing information on feeding traits" but there are no associated trait value in the blue text, so these references are actually for the black text?
+- Some values in blue text have no reference citated and these were marked by NA in the annotation
+- Manually revise reference for Harringia trophic group: macrofilter-feeders; raptors is [35]
+- No clear references for most other than habitat
+- In TableS2 notes: "Corona defined by possessing cilia used in swimming &/or food capture; not as an infundibulum [20]"
 ```{r}
+data <- read.csv(
+  here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_supplementarytable2_part1.csv"))
+refs <- read.csv(
+  here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_references.csv"))
+data_feeding <- read.csv(
+  here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_supplementarytable2_part2.csv"))
 
+
+# Organize habitat
+obertegger.1 <- data %>% 
+  select(genus, family, habitat, habitatref, habitat.coding.summarizing.information) %>% 
+  mutate(verbatimScientificName = genus,
+         verbatimTraitValue = habitat.coding.summarizing.information,
+         verbatimTraitName = "habitat coding summarizing information",
+         notes = habitat, # This is an elaborated habitat trait value with the reference
+         secondaryReference = "Obertegger2023") %>% 
+  # extract the reference
+  group_by(habitatref) %>% 
+  mutate(primaryReference = getref(habitatref, refs.list = refs)) %>% 
+  ungroup() %>% 
+  select(-c(habitat, habitatref, habitat.coding.summarizing.information))
+
+# Organize Trophi to Corona
+obertegger.2 <- data %>% 
+  select(genus, family, trophi.type, lorica, defence, foot, corona, coronaRef) %>% 
+  mutate(verbatimScientificName = genus,
+         secondaryReference = "Obertegger2023") %>% 
+  pivot_longer(cols = c(trophi.type, lorica, defence, foot, corona),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  # assign the corona primary reference
+  group_by(coronaRef, verbatimTraitName) %>% 
+  mutate(primaryReference = if_else(verbatimTraitName == "corona",
+         getref(coronaRef, refs.list = refs), NA)) %>% 
+    ungroup() %>% 
+  select(-coronaRef) %>% 
+  relocate(genus, family, verbatimScientificName,
+           verbatimTraitName, verbatimTraitValue,
+           primaryReference, secondaryReference)
+
+# Oraganize feed traits 
 ```
 
 ## Barnett et al 2007 FW zooplankton
