@@ -431,6 +431,7 @@ colina.long <- data %>%
   mutate(verbatimTraitUnit = if_else(
     verbatimTraitName == "CR..mL.ind.1.d.1.", 
     "mL ind-1 d-1", "ugC ind-1 d-1")) %>% 
+  mutate(verbatimTraitName = str_trim(str_replace_all(verbatimTraitName,"\\."," "))) %>%
 # reassign MBFG descriptions and phyto concentration to notes
   left_join(mbfg, by = "MBFG") %>% 
   mutate(notes = paste("Phytoplankton initial concentration C0 =",
@@ -456,6 +457,13 @@ TODO:
 - Manually revise reference for Harringia trophic group: macrofilter-feeders; raptors is [35]
 - No clear references for most other than habitat
 - In TableS2 notes: "Corona defined by possessing cilia used in swimming &/or food capture; not as an infundibulum [20]"
+
+TODO: Standardize the coding of the feeding traits:
+There are 4 feeding related traits: 
+ 1. feeding mechanism: ciliary movement, active capture, infundibulum 
+ 2. feeding niche: predator, microphagous TAXA, parasite, polyphagus, endosymbiotic algae in gut
+ 3. feeding type: phytophage, zoophage, trypot-bacterio, parasite [fuzzy]
+ 4. size of ingested particles: macrophages, microphages, parasite
 ```{r}
 data <- read.csv(
   here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_supplementarytable2_part1.csv"))
@@ -497,7 +505,45 @@ obertegger.2 <- data %>%
            verbatimTraitName, verbatimTraitValue,
            primaryReference, secondaryReference)
 
-# Oraganize feed traits 
+# Oraganize feeding traits 
+obertegger.3 <- data_feeding %>% 
+  mutate(verbatimScientificName = genus,
+         secondaryReference = "Obertegger2023") %>% 
+  # the references in this column are expanded in Ref1-4, use this instead if this is the reference for all columns actually.
+  pivot_longer(cols = c(feeding.mechanism.sensu.Monakov..1976., 
+                        feeding.niche.categories.sensu.Gilbert..2022.,
+                        feeding.types.sensu.Monakov..1976.,
+                        size.of.ingested.particles.after.Monakov..1976.),
+               names_to = "verbatimTraitName",
+               values_to = "verbatimTraitValue") %>% 
+  mutate(verbatimTraitName = str_trim(str_replace_all(verbatimTraitName,"\\."," "))) %>% 
+  # Assign reference based on traitName
+  mutate(refCode = if_else(verbatimTraitName == "feeding mechanism sensu Monakov  1976",
+                           REF1.Monakov..1976., NA),
+         refCode = if_else(verbatimTraitName == "feeding niche categories sensu Gilbert  2022",
+                           REF2.Gilbert..2022., refCode),
+         refCode = if_else(verbatimTraitName == "feeding types sensu Monakov  1976",
+                           REF3.Monakov..1976., refCode),
+         refCode = if_else(verbatimTraitName == "size of ingested particles after Monakov  1976",
+                           REF4.Monakov..1976., refCode)) %>% 
+  
+  
+  group_by(refCode) %>%
+  mutate(primaryReference = getref(refCode, refs.list = refs)) %>%
+  ungroup() %>% 
+
+  # assign the sensu and literature to fill missing info to notes
+  mutate(notes = if_else(nchar(primaryReference) > 1,
+                         paste(verbatimTraitName, ";reference to fill missing info:", primaryReference),
+                         verbatimTraitName)) %>% 
+  select(-c(refCode, REF1.Monakov..1976., REF2.Gilbert..2022., 
+            REF3.Monakov..1976., REF4.Monakov..1976., 
+            literature.to.fill.missing.information.on.feeding.traits)) %>% 
+  relocate(genus, family, verbatimScientificName,
+           verbatimTraitName, verbatimTraitValue,
+           primaryReference, secondaryReference, notes) %>% 
+  
+  filter(nchar(verbatimTraitValue) > 1)
 ```
 
 ## Barnett et al 2007 FW zooplankton
