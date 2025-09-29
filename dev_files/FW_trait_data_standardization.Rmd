@@ -370,9 +370,9 @@ heb.long <- bind_rows(heb.C, heb.N, heb.P, heb.NP,
 # NOTE that because heb.tg is categorical, separate if for now before unit conversions of the numerical traits
 heb.long.tg <- heb.tg
 
-rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
-   heb.resp, heb.Nex, heb.Pex, heb.NPex,
-   dm.sub,heb.bl, heb.dm, )
+# rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
+#    heb.resp, heb.Nex, heb.Pex, heb.NPex,
+#    dm.sub,heb.bl, heb.dm, )
 ```
 
 ## Beisner trait matrix
@@ -547,8 +547,153 @@ obertegger.3 <- data_feeding %>%
 ```
 
 ## Barnett et al 2007 FW zooplankton
+**Note that primary references** are not provided for now because the encoding of the references and notes are not yet complete. 
 ```{r}
+f <- here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_tables_corrigendum_working.xlsx")
+
+# Temporary data
+table1 <- openxlsx::read.xlsx(f, sheet = "table 1", startRow = 2)
+table2 <- openxlsx::read.xlsx(f, sheet = "table 2", startRow = 2)
+table3 <- openxlsx::read.xlsx(f, sheet = "table 3", startRow = 2)
+table4 <- openxlsx::read.xlsx(f, sheet = "table 4", startRow = 2)
+
+# Simply isolate species and traits
+barnett1 <- table1 %>% 
+  select(-c(Length_ref, Length_notes)) %>% 
+  pivot_longer(cols = c(`Mean.body.length.(mm)`, `Food.size.range.(um)`,
+         `Max.clearance.rate.(uL.ind-1.h-1)`, Regression.CR.vs.length,
+         `Mesh.size.(um)`, `Fastest.generation.time.(days)`, 
+         `Max.r.life.table.(day-1)`, `Max.r.population.growth.experiments.(day-1)`,
+         `C/P`, `C/N`), 
+         names_to = "verbatimTraitName",
+         values_to = "verbatimTraitValue", 
+         values_transform = as.character) %>% 
+  mutate(secondaryReference = "Barnett2007") %>% 
+  filter(!is.na(verbatimTraitValue))
+
+barnett2 <- table2 %>% 
+  pivot_longer(cols = c(`Mean.body.length.(mm)`, `Food.size.range.(um)`,
+                        `Max.clearance.rate.(uL.ind-1.h-1)`, 
+                        `Fastest.generation.time.(days)`,
+                        `C/P`, `C/N`), 
+         names_to = "verbatimTraitName",
+         values_to = "verbatimTraitValue", 
+         values_transform = as.character) %>% 
+  mutate(secondaryReference = "Barnett2007") %>% 
+  filter(!is.na(verbatimTraitValue))
+
+barnett3 <- table3 %>% 
+  select(-ends_with("_ref")) %>% 
+  pivot_longer(cols = c(`Habitat`:`Food.size`), 
+         names_to = "verbatimTraitName",
+         values_to = "verbatimTraitValue", 
+         values_transform = as.character) %>% 
+  mutate(secondaryReference = "Barnett2007") %>% 
+  filter(!is.na(verbatimTraitValue))
+
+
+barnett4 <- table4 %>% 
+  select(-ends_with("_ref")) %>% 
+  select(-ends_with("Ref")) %>% 
+  pivot_longer(cols = c(`Trophic.group`:`Selectivity`), 
+         names_to = "verbatimTraitName",
+         values_to = "verbatimTraitValue", 
+         values_transform = as.character) %>% 
+  mutate(secondaryReference = "Barnett2007") %>% 
+  filter(!is.na(verbatimTraitValue))
+
+barnett.all <- bind_rows(barnett1, barnett2, barnett3, barnett4) %>% 
+  rename(verbatimScientificName = Species)
+rm(barnett1, barnett2, barnett3, barnett4,
+   table1, table2, table3, table4)
+```
+
+# Merge all trait references into a single data frame
+```{r}
+fw.traits <- bind_rows(
+  heb.long %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)),
+  heb.long.tg,
+  beisner.long %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)),
+  colina.long %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)),
+  obertegger.1 %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)), 
+  obertegger.2 %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)), 
+  obertegger.3 %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)),
+  barnett.all
+) %>% 
+  # temporarily filter to core columns
+  select(verbatimScientificName, 
+         verbatimTraitName,
+         verbatimTraitValue,
+         secondaryReference,
+         family, genus, Species.name, Group.counterpart) %>% 
+    mutate(organizedSpeciesName = if_else(is.na(Species.name),
+                                        verbatimScientificName,
+                                        Species.name)) %>% 
+  group_by(organizedSpeciesName) %>% 
+  mutate(organizedGenus =  strsplit(organizedSpeciesName, " ")[[1]][1]) %>% 
+  ungroup()
+
+
+fw.traits %>% 
+  group_by(secondaryReference) %>% 
+  count()
+
+nrecords <- fw.traits %>% 
+  group_by(organizedSpeciesName) %>% 
+  summarise(nrecords = n(), .groups = "drop")
+ggplot(nrecords, aes(x = nrecords)) +
+  geom_histogram() +
+  theme_bw()
+
+# TODO rgbif get taxonomy table
+
+length(unique(fw.traits$verbatimScientificName))
+length(unique(fw.traits$verbatimScientificName))
+
+# # Create list of traitnames for standardization
+# traits <- fw.traits %>% 
+#   distinct(verbatimTraitName) %>% 
+#   arrange(verbatimTraitName)
+# # Export
+# write.csv(traits, file = here("dev_files/traits_list_to_standardize.csv"))
+
+# Load standardized trait names
+traits.stand <- read.csv(here("dev_files/traits_list_standardized.csv"))
+fw.traits <- fw.traits %>% 
+  left_join(traits.stand, by = "verbatimTraitName")
 
 ```
 
+# TODO: exploratory plots of trait coverage
+30 trait names/categories
+453 unstandardize species names
+3560 taxa-trait records
+1617 genus-trait records
+
+the corona/food... are for rotifers
+```{r}
+# number of traits per genera
+fw.summary <- fw.traits %>% 
+  group_by(organizedGenus, standTraitName) %>% 
+  summarise(nrecords = n(),
+            .groups = "drop")
+
+# number of genera with trait data
+fws.1 <- fw.summary %>% 
+  group_by(standTraitName) %>% 
+  summarise(ngenera = n(),
+            .groups = "drop") %>% 
+  arrange(ngenera) %>% 
+  mutate(standTraitName = factor(standTraitName,
+                                 levels = unique(standTraitName)))
+
+ggplot(fws.1, aes(x = standTraitName, y = ngenera)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_bw() +
+  ylab("# Genera") + xlab("Trait")
+
+ggsave(here("figures/FW_trait_genus_summary.png"),
+            bg = "white", width = 6, height = 4, units = "in")
+```
 
