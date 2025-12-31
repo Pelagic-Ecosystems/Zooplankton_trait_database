@@ -26,6 +26,9 @@ source("../toolkit.R")
 # The base format of the trait database data frame.
 s.format <- read.csv(here("data_input/trait_dataset_standard_format_20230628.csv"))[-1,]
 
+# Trait directory for converting verbatim trait names
+trait.directory <- read.csv(here("data_input/trait_directory_2025.csv")) %>% 
+  select(-c(traitBucket, traitNum, trait))
 
 getref <- function(refval = NA, refs.list = refs) {
   # If multiple vals seperated by comma, separate
@@ -36,10 +39,11 @@ getref <- function(refval = NA, refs.list = refs) {
   df <- paste0(ref.sub$ref_id, collapse = "; ")
   return(df)
 }
+
 ```
 
-# Read data
-## Hebert et al. 2016 - Freshwater
+# Hebert et al. 2016 - Freshwater
+## Read data
 - Note that Macrosetella sp. has no habitat type so excluded in previous curation
 ```{r}
 # Original file
@@ -276,9 +280,15 @@ heb.Nex <- data %>%
                names_to = "notes",
                values_to = "verbatimTemperature") %>% 
   filter(!is.na(verbatimTemperature)) %>% 
-  # Verbatim temperature can be mid point of the min-max values?
-  mutate(notes = paste("Temperature variable is", notes)) %>% 
-  
+  # Verbatim temperature can be mid point of the min-max values
+  group_by(Group, Genus, Species, observationNumber, Ref.N.ex,
+           verbatimTraitName, verbatimTraitValue) %>% 
+  mutate(notes = paste("Temperature variable based on ",
+                       paste(notes, collapse = ","),
+                       paste(as.character(verbatimTemperature), collapse = ","))) %>% 
+  mutate(verbatimTemperature = mean(verbatimTemperature)) %>% 
+  distinct() %>% 
+  ungroup() %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016",
          verbatimTraitUnit = "") %>% 
@@ -309,8 +319,15 @@ heb.Pex <- data %>%
                names_to = "notes",
                values_to = "verbatimTemperature") %>% 
   filter(!is.na(verbatimTemperature)) %>% 
-  # Verbatim temperature can be mid point of the min-max values?
-  mutate(notes = paste("Temperature variable is", notes)) %>% 
+  # Verbatim temperature can be mid point of the min-max values
+  group_by(Group, Genus, Species, observationNumber, Ref.P.ex,
+           verbatimTraitName, verbatimTraitValue) %>% 
+  mutate(notes = paste("Temperature variable based on ",
+                       paste(notes, collapse = ","),
+                       paste(as.character(verbatimTemperature), collapse = ","))) %>% 
+  mutate(verbatimTemperature = mean(verbatimTemperature)) %>% 
+  distinct() %>% 
+  ungroup() %>% 
   
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016",
@@ -346,43 +363,214 @@ heb.NPex <- data %>%
          secondaryReference, primaryReference, observationNumber, 
          Group, Genus, Species)
 
+# Add some of the marine NP excretion ratios not included in the original database version
+heb.NPex.marine <- read.csv2(f, sep = ";", dec = ",") %>% 
+  filter(Habitat == "Marine") %>% 
+  mutate(Min.NP.ex = as.numeric(str_replace(str_replace(Min.NP.ex," ",""),",","."))) %>% 
+  select(Group, Genus, Species, Replicate.number,
+           N.P.ex:Ref.NPex) %>% 
+  rename(observationNumber = Replicate.number) %>% 
+  pivot_longer(cols = c(N.P.ex, Min.NP.ex, Max.NP.ex),
+           names_to = "verbatimTraitName",
+           values_to = "verbatimTraitValue") %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(verbatimScientificName = paste(Genus, Species),
+         secondaryReference = "Hebert2016") %>% 
+  group_by(Ref.NPex) %>% 
+  mutate(primaryReference = getref(Ref.NPex)) %>% 
+  ungroup() %>% 
+  select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
+         secondaryReference, primaryReference, observationNumber, 
+         Group, Genus, Species)
+
 
 # Determine the associate size value?
 dm.sub <- heb.dm %>% 
+  filter(verbatimTraitName == "Dry.mass") %>% 
   select(verbatimScientificName, observationNumber,
          sizeAssocName = verbatimTraitName,
          sizeAssocValue = verbatimTraitValue,
          sizeAssocUnit = verbatimTraitUnit,
-         sizeAssocReference = primaryReference)
+         sizeAssocReference = primaryReference) %>% 
+  mutate(sizeAssocName = "dryWeight")
 
-# TODO calculate the mid point fo size to prevent many-to-many left joins in Pex
-# TODO maybe do this for the combined data frame so that elemental composition have values too
 # Combine all rows
 heb.long <- bind_rows(heb.C, heb.N, heb.P, heb.NP,
                       heb.lip, heb.prot,
-                      heb.resp, heb.Nex, heb.Pex, heb.NPex) %>% 
+                      heb.resp, heb.Nex, heb.Pex, heb.NPex,
+                      heb.NPex.marine) %>% 
   # Add size associated values for physiology and composition traits
   left_join(dm.sub,
             by = join_by(verbatimScientificName, observationNumber)) %>% 
   # Add the size traits
-  bind_rows(heb.bl, heb.dm)
+  bind_rows(heb.bl, heb.dm) %>% 
 
-# NOTE that because heb.tg is categorical, separate if for now before unit conversions of the numerical traits
-heb.long.tg <- heb.tg
+# Recode traitNames and units, add traitID and valueType
+  mutate(verbatimTraitUnit = if_else(verbatimTraitUnit == "%",
+                                     "percent", verbatimTraitUnit)) %>% 
+  mutate(verbatimTraitUnit = if_else(is.na(verbatimTraitUnit),
+                                     "", verbatimTraitUnit)) %>% 
+  mutate(verbatimTraitUnit = str_replace(verbatimTraitUnit, "µ", "u")) %>%
+  mutate(verbatimTraitUnit = str_replace(verbatimTraitUnit, "mgDM-1", "mg DM-1")) %>% 
+  left_join(trait.directory, by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  mutate(traitValue = verbatimTraitValue,
+    traitValueTemperature = verbatimTemperature)
 
-# rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
-#    heb.resp, heb.Nex, heb.Pex, heb.NPex,
-#    dm.sub,heb.bl, heb.dm, )
+
+
+# Recoding categorical traits
+# NOTE that because heb.tg is categorical, separate it for now before unit conversions of the numerical traits
+heb.long.tg <- heb.tg %>% 
+  mutate(verbatimTraitUnit = "") %>% 
+  left_join(trait.directory, by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  mutate(traitValue = tolower(verbatimTraitValue)) %>% 
+  mutate(traitValue = if_else(verbatimTraitValue == "OmniHerb",
+                              "omnivore; herbivore", traitValue),
+         traitValue = if_else(verbatimTraitValue == "OmniCarn",
+                            "omnivore; carnivore", traitValue),
+         traitValue = if_else(verbatimTraitValue == "Predator",
+                            "carnivore", traitValue)) 
+ 
+
+# TODO find references not in master reference list and organize DOIs
+# TODO rename some refs to match how it is coded in the master list (e.g. Ikeda1974 can be Ikeda1974a/b)
+master.ref <- read.csv(here("data_input/reference_list_2025.csv"))
+refs2organize.heb <- refs %>% 
+  filter(ref_id %notin% master.ref$referenceCode)
+
+# TODO merge and organize...convert numerics to character
+colnames(heb.long)
+colnames(heb.long.tg)
+
+level0.heb <- heb.long %>% 
+  mutate(traitValue = as.character(traitValue)) %>% 
+  mutate(verbatimTraitValue = as.character(verbatimTraitValue)) %>% 
+  # set life stage (assume default is female)
+  mutate(lifeStage = if_else(grepl("(M)", Species, fixed = TRUE), "M","F")) %>% 
+  mutate(stageID = if_else(grepl("(M)", Species, fixed = TRUE),3, 2)) %>% 
+  bind_rows(heb.long.tg)
+
+
+# Save the level0 data...
+save(file = here("dev_files/standardized_datasets_dfs/level0_Hebert2016.RData"),
+     level0.heb, refs2organize.heb)
+
+rm(heb.C, heb.N, heb.P, heb.NP, heb.lip, heb.prot,
+   heb.resp, heb.Nex, heb.Pex, heb.NPex,
+   dm.sub,heb.bl, heb.dm, heb.NPex.marine, heb.tg,
+   heb.long, heb.long.tg, refs)
 ```
 
-## Beisner trait matrix
+## Standardize data from level0 to level1 standardized
+Unit conversion of numerical traits not necessary because already follows the standard
+```{r, eval=FALSE}
+# update numeric data by removing all _Min or _Max values and appending the derived midpoint values
+data.midpoint <- heb.long %>% 
+  filter(grepl("_Min|_Max", traitName)) %>% 
+  mutate(traitValue = as.numeric(verbatimTraitValue)) %>% 
+  mutate(traitName  = gsub("\\_Min","",traitName),
+         traitName = gsub("\\_Max","",traitName)) %>% 
+  group_by(traitName, traitUnit, observationNumber,
+           primaryReference, secondaryReference) %>% 
+  mutate(traitValueN = n(),
+         traitValue = mean(traitValue), 
+         notes = cleanStrings(paste(notes,"; value is midpoint of min and max")),
+         verbatimTraitName = paste0(verbatimTraitName, collapse = "; "),
+         verbatimTraitValue = paste0(verbatimTraitValue, collapse = "; "),
+         isDerived = TRUE,
+         traitValueSource = "derived from midpoint of range") %>% 
+  ungroup()  %>% 
+  distinct(traitValue,
+           traitName, traitUnit, 
+           primaryReference, secondaryReference, .keep_all = TRUE) %>% 
+  standardizeID(trait.directory) %>% 
+  # NA observation numbers because these are new records and will be assigned new IDs
+  mutate(traitTaxonID = NA, observationNumber = NA, maxObsNum = NA)
+  
+heb.long.2 <- heb.long %>% 
+  filter(!(grepl("_Min|_Max", traitName))) %>% 
+  bind_rows(data.midpoint) 
+
+
+# Apply weight specific conversions
+data.WSDW <- heb.long.2 %>% 
+  filter(traitName %in% c("respirationRate", "excretionRateN", "excretionRateP")) %>% 
+  filter(!is.na(sizeAssocValue)) %>% 
+  group_by(verbatimScientificName, primaryReference) %>% 
+  mutate(traitValue = traitValue / sizeAssocValue,
+         traitName = paste0(traitName,"_WSDW"),
+         traitUnit = str_replace(traitUnit,"h","mg DW^-1 h"),
+         notes = cleanStrings(paste(notes,"; calculated weight specific value from associated size value")),
+         isDerived = TRUE,
+         traitValueSource = "derived from individual-specific value") %>% 
+  ungroup() %>% 
+  # reassign trait ID 
+  standardizeID(trait.directory) %>% 
+  mutate(traitTaxonID = NA, observationNumber = NA, maxObsNum = NA)
+
+heb.long.2 <- bind_rows(heb.long.2, data.WSDW) 
+
+# TODO Apply temperature standardization
+data.rates.resp <- heb.long.2 %>% 
+  filter(traitName %in% c("respirationRate",
+                          "respirationRate_WSDW"))  %>% 
+  mutate(traitValueTemperature = as.numeric(traitValueTemperature)) %>% 
+  filter(!is.na(traitValueTemperature)) %>% 
+  group_by(traitTaxonID) %>% 
+  mutate(traitValue = standard_temp(traitValue, traitValueTemperature),
+         traitName = paste0(traitName,"_15C"),
+         traitValueTemperature = 15,
+         notes = cleanStrings(paste(notes,"; value temperature standardized with Q10 = 2.8")),
+         isDerived = TRUE,
+         traitValueSource = "calculated using Q10 equation") %>% 
+  ungroup()
+
+# Excretion rates Ammonia Q10=2.0, phosphate Q10=1.55 (Based on Hebert et al. 2016)
+data.rates.ex.N <- heb.long.2 %>% 
+  filter(traitName %in% c("excretionRateN","excretionRateN_WSDW")) %>% 
+  mutate(traitValueTemperature = as.numeric(traitValueTemperature)) %>% 
+  filter(!is.na(traitValueTemperature)) %>% 
+  group_by(traitTaxonID) %>% 
+  mutate(traitValue = standard_temp(traitValue, traitValueTemperature,
+                                    t = 15, Q10 = 2.0),
+         traitName = paste0(traitName,"_15C"),
+         traitValueTemperature = 15,
+         notes = cleanStrings(paste(notes,"; value temperature standardized with Q10 = 2.0")),
+         isDerived = TRUE,
+         traitValueSource = "calculated using Q10 equation") %>% 
+  ungroup()
+
+data.rates.ex.P <- heb.long.2 %>% 
+  filter(traitName %in% c("excretionRateP","excretionRateP_WSDW")) %>% 
+  mutate(traitValueTemperature = as.numeric(traitValueTemperature)) %>% 
+  filter(!is.na(traitValueTemperature)) %>% 
+  group_by(traitTaxonID) %>% 
+  mutate(traitValue = standard_temp(traitValue, traitValueTemperature,
+                                    t = 15, Q10 = 1.55),
+         traitName = paste0(traitName,"_15C"),
+         traitValueTemperature = 15,
+         notes = cleanStrings(paste(notes,"; value temperature standardized with Q10 = 1.55")),
+         isDerived = TRUE,
+         traitValueSource = "calculated using Q10 equation") %>% 
+  ungroup()
+
+
+# TODO save the dataset into a dataframe 
+
+
+
+```
+
+
+
+# Beisner trait matrix
 *NEED TO CONFIRM PRIMARY REFERENCES*
 - Also need to confirm if the sample column is just for specific study (For 8 species listed as both Sample = Pelagic and Sediment, the size value is the same, for 12 species, size is different)
 - Note that some taxa names are "calanoid/cyclopoid copepodite"
 ```{r}
 f <- here("dev_files/literature_data/Fresh water zooplankton traits - from B Beisner/Functionaltraitsmatrix.csv")
 
-beisner.long <- read.csv(f) %>% 
+level0.beis <- read.csv(f) %>% 
 # Change . in species name
   mutate(verbatimScientificName = Species.name) %>% 
   mutate(Species.name = str_trim(str_replace_all(Species.name,"\\."," "))) %>% 
@@ -392,18 +580,37 @@ beisner.long <- read.csv(f) %>%
                names_to = "verbatimTraitName",
                values_to = "verbatimTraitValue") %>% 
   mutate(verbatimTraitUnit = if_else(verbatimTraitName == "mean.length_mm",
-                                     "mm", NA),
-         secondaryReference = "BeisnerData") %>% 
-  # Remove instances when records are duplicated because there were sepearate rows for Sample = Pelagic/Sediment. For 12 species, the size trait is different between samples
+                                     "mm", ""),
+         secondaryReference = "BeisnerData",
+         # TODO find out references if present (maybe duplicated with the Barnett et al. 2007/Hebert et al. 2016)
+         primaryReference = "TBD") %>% 
+  # Remove instances when records are duplicated because there were separate rows for Sample = Pelagic/Sediment. For 12 species, the size trait is different between samples
   group_by(verbatimScientificName, verbatimTraitName, verbatimTraitValue) %>% 
   filter(row_number() == 1) %>% 
   mutate(notes = paste("Sample =", Sample)) %>% 
-  select(-Sample)
+  ungroup() %>% 
+  select(-Sample) %>% 
+  # standardize traitnames and units
+  left_join(trait.directory,  by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  mutate(traitValue = tolower(verbatimTraitValue)) %>% 
+  # rename levels of categorical data
+  mutate(traitValue = case_when(
+    verbatimTraitValue == "Interm" ~ "intermediate",
+    verbatimTraitValue == "Omnivore/Carnivore" ~ "omnivore; carnivore",
+    verbatimTraitValue == "Omnivore/Herbivore" ~ "omnivore; herbivore",
+    verbatimTraitValue == "current-cruiser" ~ "current; cruise",
+    verbatimTraitValue == "Raptorial" ~ "cruise",
+    .default =  traitValue))
+
+save(file = here("dev_files/standardized_datasets_dfs/level0_BeisnerData.RData"),
+     level0.beis)
+
 ```
 
-## Colina et al. 2016
+# Colina et al. 2016
 The appendix.csv and references.csv are the spreadsheet version of the supplementary word file. The references column was manually annotated to fix typos and change special characters.
 - Note: clearance (CR, mL.ind-1 d-1) and ingestion rates (IR, ugC.ind-1.d-1), phytoplankton initial concentration (C0, mgC.L-1), MBFG affiliation of the phytoplankton, and references.
+- Note: no associated temperature or size information 
 
 MBFG	Description
 I	Small organisms with high sruface/volume
@@ -417,12 +624,12 @@ VII	Large mucilaginous colonies
 ```{r}
 data <- read.csv(
   here("dev_files/literature_data/Colina 2016/Colina2016_supplementary_appendix.csv"))
-refs <- read.csv(
+refs2organize.coli <- read.csv(
   here("dev_files/literature_data/Colina 2016/Colina2016_references.csv"))
 mbfg <- read.csv(
    here("dev_files/literature_data/Colina 2016/MBFG_table.csv"))
 
-colina.long <- data %>% 
+level0.coli <- data %>% 
 # rename columns and assign units
   rename(verbatimScientificName = Zooplankton.species) %>% 
   pivot_longer(cols = c("CR..mL.ind.1.d.1.","IR..ugC.ind.1.d.1."),
@@ -437,18 +644,25 @@ colina.long <- data %>%
   mutate(notes = paste("Phytoplankton initial concentration C0 =",
                        C0..mgC.L.1., "mg C L-1; Prey type =", MBFG_descriptor)) %>% 
 # reassign references
-  left_join(refs %>% select(primaryReference, Reference_ed = Reference),
+  left_join(refs2organize.coli %>% 
+              select(primaryReference, Reference_ed = Reference),
             by = "Reference_ed") %>% 
   mutate(secondaryReference = "Colina2016") %>% 
   select(-c(Reference, Reference_ed, C0..mgC.L.1., MBFG, MBFG_descriptor)) %>% 
   # remove blanks in trait value
-  mutate(verbatimTraitValue = as.numeric(verbatimTraitValue)) %>% 
-  filter(!is.na(verbatimTraitValue))
+  mutate(verbatimTraitValue = as.character(verbatimTraitValue)) %>% 
+  filter(!is.na(verbatimTraitValue)) %>% 
 
+# TODO standardize traitNames and Units
+
+  left_join(trait.directory,  by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  mutate(traitValue = verbatimTraitValue) 
+    
+save(file = here("dev_files/standardized_datasets_dfs/level0_Colina2016.RData"),
+     level0.coli, refs2organize.coli)
 ```
 
-TODO:
-## Obertegger and Wallace 2023 Rotifers 
+# Obertegger and Wallace 2023 Rotifers 
 - Traits at genus level
 - Feeding traits were from specific references except some feeding trait values that were filled in based on literature. These were only marked by color in the spreadsheet so these needed to be manually organized to long format.
 - Note that for the column headers that cite references as sensu/after CITATION, these references are not in the provided list and it is unclear if the values assigned colored in black were based on these references or the reference was just used for the terminology. For now, consider these as the primary reference but need to check the individual sources later.
@@ -467,7 +681,7 @@ There are 4 feeding related traits:
 ```{r}
 data <- read.csv(
   here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_supplementarytable2_part1.csv"))
-refs <- read.csv(
+refs2organize.ober <- read.csv(
   here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_references.csv"))
 data_feeding <- read.csv(
   here("dev_files/literature_data/Rotifers Obertegger and Wallace 2023/Obertegger2023_supplementarytable2_part2.csv"))
@@ -483,9 +697,18 @@ obertegger.1 <- data %>%
          secondaryReference = "Obertegger2023") %>% 
   # extract the reference
   group_by(habitatref) %>% 
-  mutate(primaryReference = getref(habitatref, refs.list = refs)) %>% 
+  mutate(primaryReference = getref(habitatref, refs.list = refs2organize.ober)) %>% 
   ungroup() %>% 
-  select(-c(habitat, habitatref, habitat.coding.summarizing.information))
+  select(-c(habitat, habitatref, habitat.coding.summarizing.information)) %>% 
+  #  standardize traitName and trait value coding
+  left_join(trait.directory) %>% 
+  mutate(traitValue = case_when(
+    verbatimTraitValue == "littoral, periphytic" ~ "littoral; periphytic",
+    verbatimTraitValue == "planktonic or semi-planktonic" ~ "planktonic; semi-planktonic",
+    verbatimTraitValue == "littoral or periphytic; sometimes in plankton" ~ 
+      "littoral; periphytic",
+    .default = verbatimTraitValue
+  ))
 
 # Organize Trophi to Corona
 obertegger.2 <- data %>% 
@@ -498,12 +721,17 @@ obertegger.2 <- data %>%
   # assign the corona primary reference
   group_by(coronaRef, verbatimTraitName) %>% 
   mutate(primaryReference = if_else(verbatimTraitName == "corona",
-         getref(coronaRef, refs.list = refs), NA)) %>% 
+         getref(coronaRef, refs.list = refs2organize.ober), NA)) %>% 
     ungroup() %>% 
   select(-coronaRef) %>% 
   relocate(genus, family, verbatimScientificName,
            verbatimTraitName, verbatimTraitValue,
-           primaryReference, secondaryReference)
+           primaryReference, secondaryReference) %>% 
+
+  #  standardize traitName and trait value coding
+  left_join(trait.directory) %>% 
+  mutate(traitValue = tolower(verbatimTraitValue))
+
 
 # Oraganize feeding traits 
 obertegger.3 <- data_feeding %>% 
@@ -518,18 +746,17 @@ obertegger.3 <- data_feeding %>%
                values_to = "verbatimTraitValue") %>% 
   mutate(verbatimTraitName = str_trim(str_replace_all(verbatimTraitName,"\\."," "))) %>% 
   # Assign reference based on traitName
-  mutate(refCode = if_else(verbatimTraitName == "feeding mechanism sensu Monakov  1976",
+  mutate(refCode = if_else(verbatimTraitName == "feeding mechanism sensu Monakov 1976",
                            REF1.Monakov..1976., NA),
-         refCode = if_else(verbatimTraitName == "feeding niche categories sensu Gilbert  2022",
+         refCode = if_else(verbatimTraitName == "feeding niche categories sensu Gilbert 2022",
                            REF2.Gilbert..2022., refCode),
-         refCode = if_else(verbatimTraitName == "feeding types sensu Monakov  1976",
+         refCode = if_else(verbatimTraitName == "feeding types sensu Monakov 1976",
                            REF3.Monakov..1976., refCode),
          refCode = if_else(verbatimTraitName == "size of ingested particles after Monakov  1976",
                            REF4.Monakov..1976., refCode)) %>% 
   
-  
   group_by(refCode) %>%
-  mutate(primaryReference = getref(refCode, refs.list = refs)) %>%
+  mutate(primaryReference = getref(refCode, refs.list = refs2organize.ober)) %>%
   ungroup() %>% 
 
   # assign the sensu and literature to fill missing info to notes
@@ -543,7 +770,38 @@ obertegger.3 <- data_feeding %>%
            verbatimTraitName, verbatimTraitValue,
            primaryReference, secondaryReference, notes) %>% 
   
-  filter(nchar(verbatimTraitValue) > 1)
+  filter(nchar(verbatimTraitValue) > 1) %>% 
+  
+  #  standardize traitName and trait value coding
+  left_join(trait.directory) %>% 
+  mutate(traitValue = case_when(
+    verbatimTraitValue == "ciliary movement creates strong currents concentrating food" ~ "current",
+    verbatimTraitValue == "active capture" ~ "cruise",
+    verbatimTraitValue == "infundibulum for enclosing & ingesting food" ~ "infundibulum",
+    verbatimTraitValue == "parasite; not defined" ~ "parasite",
+    verbatimTraitValue == "predator" ~ "carnivore",
+    verbatimTraitValue == "not defined sensu Gilbert; feeding via endosybiotic algae in the gut" ~ 
+      "endosymbiotic algae",
+    verbatimTraitValue == "Macrophagous algivores" ~ "herbivore",
+    verbatimTraitValue == "zoophages" ~ "carnivore",
+    verbatimTraitValue == "phytophages" ~ "herbivore",
+    verbatimTraitValue == "Macrophagous omnivores/predators" ~ "omnivore; carnivore",
+    verbatimTraitValue == "Polyphagous rotifers" ~ "omnivore",
+    verbatimTraitValue == "bacterio-phytophages" ~ "herbivore; bacterivore",
+    verbatimTraitValue == "phytophages-zoophages" ~ "herbivore; carnivore",
+    verbatimTraitValue == "trypto-bacterio" ~ "bacterivore",
+    verbatimTraitValue == "trypto-bacterio-phytophages" ~ "herbivore; bacterivore",
+    verbatimTraitValue == "trypto-bacterio-phytophages, zoophages" ~ "herbivore; carnivore; bacterivore",
+    verbatimTraitValue == "trypto-bacteriophages" ~ "bacterivore",
+    verbatimTraitValue == "Microphagous rotifers" ~ "bacterivore",
+    .default = tolower(verbatimTraitValue)
+  ))
+
+# TODO combine
+level0.ober <- bind_rows(obertegger.1, obertegger.2, obertegger.3)
+
+save(file =  here("dev_files/standardized_datasets_dfs/level0_Obertegger2023.RData"),
+     level0.ober, refs2organize.ober)
 ```
 
 ## Barnett et al 2007 FW zooplankton
@@ -608,7 +866,9 @@ rm(barnett1, barnett2, barnett3, barnett4,
    table1, table2, table3, table4)
 ```
 
-# Merge all trait references into a single data frame
+
+# --- Extra ---
+## Old version: Merge all trait references into a single data frame
 ```{r}
 fw.traits <- bind_rows(
   heb.long %>% mutate(verbatimTraitValue = as.character(verbatimTraitValue)),
