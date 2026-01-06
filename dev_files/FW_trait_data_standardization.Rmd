@@ -827,7 +827,8 @@ barnett1 <- table1 %>%
          values_to = "verbatimTraitValue", 
          values_transform = as.character) %>% 
   mutate(secondaryReference = "Barnett2007") %>% 
-  filter(!is.na(verbatimTraitValue))
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(table = "table 1")
 
 barnett2 <- table2 %>% 
   pivot_longer(cols = c(`Mean.body.length.(mm)`, `Food.size.range.(um)`,
@@ -838,7 +839,8 @@ barnett2 <- table2 %>%
          values_to = "verbatimTraitValue", 
          values_transform = as.character) %>% 
   mutate(secondaryReference = "Barnett2007") %>% 
-  filter(!is.na(verbatimTraitValue))
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(table = "table 2")
 
 barnett3 <- table3 %>% 
   select(-ends_with("_ref")) %>% 
@@ -847,7 +849,8 @@ barnett3 <- table3 %>%
          values_to = "verbatimTraitValue", 
          values_transform = as.character) %>% 
   mutate(secondaryReference = "Barnett2007") %>% 
-  filter(!is.na(verbatimTraitValue))
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(table = "table 3")
 
 
 barnett4 <- table4 %>% 
@@ -858,12 +861,24 @@ barnett4 <- table4 %>%
          values_to = "verbatimTraitValue", 
          values_transform = as.character) %>% 
   mutate(secondaryReference = "Barnett2007") %>% 
-  filter(!is.na(verbatimTraitValue))
+  filter(!is.na(verbatimTraitValue)) %>% 
+  mutate(table = "table 4")
 
 barnett.all <- bind_rows(barnett1, barnett2, barnett3, barnett4) %>% 
-  rename(verbatimScientificName = Species)
-rm(barnett1, barnett2, barnett3, barnett4,
-   table1, table2, table3, table4)
+  rename(verbatimScientificName = Species) %>% 
+  # separate commas into rows
+  separate_longer_delim(col = verbatimTraitValue, delim = ",") %>% 
+  arrange(table, verbatimTraitName) %>% 
+  relocate(table)
+
+# # Temporary export for manual annotation of references
+# write.csv(barnett.all, file = here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_forannotation.csv"),
+#         row.names = F)
+
+read.csv(here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_annotated.csv"))
+
+# rm(barnett1, barnett2, barnett3, barnett4,
+#    table1, table2, table3, table4)
 ```
 
 
