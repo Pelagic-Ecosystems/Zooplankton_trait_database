@@ -6,6 +6,7 @@ morphological,1,body length,1,bodyLength,mm,Mean.body.mength,mm,numeric
 morphological,1,body length,1,bodyLength,mm,Mean.body.length,mm,numeric
 morphological,1,body length,1,bodyLength,mm,mean.length_mm,mm,numeric
 morphological,1,body length,1,bodyLength,mm,size_Mean,mm,numeric
+morphological,1,body length,1,bodyLength,mm,Mean body length,mm,numeric
 morphological,1,body length,2,bodyLength_Max,mm,size_Max,mm,numeric
 morphological,1,body length,2,bodyLength_Max,mm,Maximum,mm,numeric
 morphological,1,body length,2,bodyLength_Max,mm,Maximal.length.[A1],mm,numeric
@@ -99,10 +100,12 @@ biochemical composition,14,elemental ratio,37,ratioCN_Max,,CNratio_Max,,numeric
 biochemical composition,14,elemental ratio,38,ratioCN,,CNratio_Mean,,numeric
 biochemical composition,14,elemental ratio,38,ratioCN,,Body.CN,,numeric
 biochemical composition,14,elemental ratio,38,ratioCN,,C:N.(by.weight),,numeric
+biochemical composition,14,elemental ratio,38,ratioCN,,C/N,,numeric
 biochemical composition,14,elemental ratio,39,ratioCN_Min,,CNratio_Min,,numeric
 biochemical composition,14,elemental ratio,40,ratioCP_Max,,CPratio_Max,,numeric
 biochemical composition,14,elemental ratio,41,ratioCP,,CPratio_Mean,,numeric
 biochemical composition,14,elemental ratio,41,ratioCP,,Body.CP,,numeric
+biochemical composition,14,elemental ratio,41,ratioCP,,C/P,,numeric
 biochemical composition,14,elemental ratio,42,ratioCP_Min,,CPratio_Min,,numeric
 biochemical composition,14,elemental ratio,43,ratioNP,,N.Pct,,numeric
 biochemical composition,14,elemental ratio,43,ratioNP,,NPratio_Mean,,numeric
@@ -156,6 +159,7 @@ behavioral,23,clearance rate,75,clearanceRate,ml h^-1,clearance,ml h-1,numeric
 behavioral,23,clearance rate,75,clearanceRate,ml h^-1,Fmax,ml/h,numeric
 behavioral,23,clearance rate,75,clearanceRate,ml h^-1,CR  mL ind 1 d 1,mL ind-1 d-1,numeric
 behavioral,23,clearance rate,76,clearanceRate_Max,ml h^-1,clearance_Max,ml h-1,numeric
+behavioral,23,clearance rate,76,clearanceRate_Max,ml h^-1,Max clearance rate,uL ind-1 h-1,numeric
 behavioral,23,clearance rate,77,clearanceRate_Min,ml h^-1,clearance_Min,ml h-1,numeric
 behavioral,23,clearance rate,78,clearanceRate_WSC,ml mg C^-1 h^-1,clearance_mg,ml mgC-1 h-1,numeric
 behavioral,23,clearance rate,79,clearanceRate_15C,ml h^-1,CR.[ml/#/h],ml h-1,numeric
@@ -256,6 +260,7 @@ behavioral,31,feeding mode,138,feedingMode,,Feeding mode,,categorical
 behavioral,31,feeding mode,138,feedingMode,,Feeding.strategy,,categorical
 behavioral,31,feeding mode,138,feedingMode,,Feeding.mode,,categorical
 behavioral,31,feeding mode,138,feedingMode,,feeding mechanism sensu Monakov  1976,,categorical
+behavioral,31,feeding mode,138,feedingMode,,Feeding type,,categorical
 behavioral,31,feeding mode,168,FM.passive,,,,binary
 behavioral,31,feeding mode,169,FM.active,,,,binary
 behavioral,31,feeding mode,170,FM.cruise,,,,binary
@@ -280,6 +285,7 @@ behavioral,33,trophic group,140,trophicGroup,,trophic.group,,categorical
 behavioral,33,trophic group,140,trophicGroup,,Trophic.Regime,,categorical
 behavioral,33,trophic group,140,trophicGroup,,feeding niche categories sensu Gilbert  2022,,categorical
 behavioral,33,trophic group,140,trophicGroup,,feeding types sensu Monakov  1976,,categorical
+behavioral,33,trophic group,140,trophicGroup,,Trophic group,,categorical
 behavioral,33,trophic group,181,TG.carnivore,,,,binary
 behavioral,33,trophic group,182,TG.omnivore,,,,binary
 behavioral,33,trophic group,183,TG.herbivore,,,,binary
@@ -342,8 +348,20 @@ physiological,43,excretion ratio,195,ratioNPExcretion,,N.P.ex,,numeric
 physiological,43,excretion ratio,196,ratioNPExcretion_Max,,Max.NP.ex,,numeric
 physiological,43,excretion ratio,197,ratioNPExcretion_Min,,Min.NP.ex,,numeric
 behavioral,44,prey size,198,preySizeCategorical,,size of ingested particles after Monakov  1976,,categorical
+behavioral,44,prey size,198,preySizeCategorical,,Food size,,categorical
 morphological,45,rotifer morphology,199,rotiferCorona,,corona,,categorical
 morphological,45,rotifer morphology,200,rotiferDefence,,defence,,categorical
 morphological,45,rotifer morphology,201,rotiferFoot,,foot,,categorical
 morphological,45,rotifer morphology,202,rotiferLorica,,lorica,,categorical
 morphological,45,rotifer morphology,203,rotiferTrophiType,,trophi.type,,categorical
+life history,42,life span,204,generationTime_Max,day,Fastest generation time,days,numerical
+life history,42,life span,204,generationTime_Max,day,Fastest generation time (days),,categorical
+life history,42,life span,205,populationGrowthR_lifetable_Max,day^-1,Max r life table,day-1,numerical
+life history,42,life span,206,populationGrowthR_experiment_Max,day^-1,Max r population growth experiments,day-1,numerical
+behavioral,23,clearance rate,207,equationClearanceRate_Size,ml h^-1,Regression CR vs length,,categorical
+behavioral,44,prey size,208,meshSize,um,Mesh size,um,numerical
+behavioral,44,prey size,209,preySizeRange,um,Food size range,um,numerical
+behavioral,46,prey preference,210,preySelectivityLevel,,Selectivity,,categorical
+morphological,47,cladoceran helmet,211,cladoceranHelmet,,Helmet,,categorical
+behavioral,48,prey productivity level,212,preyProductivityLevel,,Optimal productivity conditions,,categorical
+behavioral,49,escape response,213,escapeResponse,,Predatory escape response,,categorical

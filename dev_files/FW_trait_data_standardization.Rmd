@@ -804,9 +804,10 @@ save(file =  here("dev_files/standardized_datasets_dfs/level0_Obertegger2023.RDa
      level0.ober, refs2organize.ober)
 ```
 
-## Barnett et al 2007 FW zooplankton
+# Barnett et al 2007 FW zooplankton
 **Note that primary references** are not provided for now because the encoding of the references and notes are not yet complete. 
-```{r}
+## Create long table for annotation
+```{r, eval=FALSE}
 f <- here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_tables_corrigendum_working.xlsx")
 
 # Temporary data
@@ -875,10 +876,50 @@ barnett.all <- bind_rows(barnett1, barnett2, barnett3, barnett4) %>%
 # write.csv(barnett.all, file = here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_forannotation.csv"),
 #         row.names = F)
 
-read.csv(here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_annotated.csv"))
+rm(barnett1, barnett2, barnett3, barnett4, barnett.all,
+   table1, table2, table3, table4)
+```
 
-# rm(barnett1, barnett2, barnett3, barnett4,
-#    table1, table2, table3, table4)
+## Read long table for annotation
+```{r}
+# References
+f <- here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_tables_corrigendum_working.xlsx")
+refs2organize.barn <- openxlsx::read.xlsx(f, sheet = "References", startRow = 1) %>% 
+  rename(Ref.code = Ref, ref_id = refcode, fullCitation = full.citation)
+
+level0.barn <- read.csv(here("dev_files/literature_data/Barnett 2007 FW zooplankton/Barnett_20072013_annotated.csv")) %>% 
+
+# Remove columns
+  select(-c(table, Species_author, Group.counterpart, Species_Author)) %>% 
+
+  # Update reference codes
+  group_by(referenceCode) %>% 
+  mutate(primaryReference = getref(referenceCode, refs.list = refs2organize.barn)) %>% 
+  ungroup() %>% 
+
+# Standardize trait names and units
+
+
+  left_join(trait.directory, by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  
+  # Standardize trait values
+   mutate(traitValue = case_when(
+    verbatimTraitValue == "Omnivore carnivore" ~ "omnivore; carnivore",
+    verbatimTraitValue == "Omnivore herbivore" ~ "omnivore; herbivore",
+    verbatimTraitValue == "Current-cruiser" ~ "current; cruise",
+    verbatimTraitValue == "Raptorial" ~ "cruise",
+    .default = tolower(verbatimTraitValue)
+   )) %>% 
+  # clearance rate from ul to ml
+  mutate(traitValue = if_else(traitName == "clearanceRate_Max",
+                              as.character(as.numeric(traitValue)/1000), 
+                              traitValue)) %>% 
+  mutate(assocTemperature = verbatimTemperature)
+  
+
+
+save(file =  here("dev_files/standardized_datasets_dfs/level0_Barnett2007.RData"),
+     level0.barn, refs2organize.barn)
 ```
 
 
