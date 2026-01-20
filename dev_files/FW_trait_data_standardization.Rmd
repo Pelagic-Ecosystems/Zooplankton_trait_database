@@ -53,7 +53,7 @@ data <- read.csv2(f, sep = ";", dec = ",") %>%
   filter(Habitat == "Freshwater")
 
 # reference table
-refs <- read.csv(here("dev_files/literature_data/Hebert2016/references_ed.csv"))
+refs <- read.csv(here("dev_files/literature_data/Hebert2016/references_ed_v2.csv"))
 
 
 # Replace non numeric rows to numeric and , to .
@@ -85,12 +85,13 @@ heb.tg <- data %>%
   mutate(verbatimScientificName = paste(Genus, Species),
          verbatimTraitName = "Trophic.group",
          secondaryReference = "Hebert2016") %>% 
-    group_by(Ref.tg) %>% 
-  mutate(primaryReference = getref(Ref.tg)) %>% 
+  mutate(Ref.code = Ref.tg) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
   # TODO recode trait value?
 
 heb.bl <- data %>% 
@@ -103,12 +104,13 @@ heb.bl <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.bl) %>% 
-  mutate(primaryReference = getref(Ref.bl)) %>% 
+  mutate(Ref.code = Ref.bl) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "mm")
   
 
@@ -122,12 +124,13 @@ heb.dm <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.dm) %>% 
-  mutate(primaryReference = getref(Ref.dm)) %>% 
+  mutate(Ref.code = Ref.dm) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "mg")
 
 heb.C <- data %>% 
@@ -140,12 +143,13 @@ heb.C <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.C) %>% 
-  mutate(primaryReference = getref(Ref.C)) %>% 
+  mutate(Ref.code = Ref.C) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "%") %>% 
   mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Cct.total",
                                      "mg", verbatimTraitUnit))
@@ -160,12 +164,13 @@ heb.N <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.N) %>% 
-  mutate(primaryReference = getref(Ref.N)) %>% 
+  mutate(Ref.code = Ref.N) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "%") %>% 
   mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Nct.total",
                                      "mg", verbatimTraitUnit))
@@ -181,12 +186,13 @@ heb.P <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.P) %>% 
-  mutate(primaryReference = getref(Ref.P)) %>% 
+  mutate(Ref.code = Ref.P) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "%") %>% 
   mutate(verbatimTraitUnit = if_else(verbatimTraitName == "Pct.total",
                                      "mg", verbatimTraitUnit))
@@ -201,12 +207,13 @@ heb.NP <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.NP) %>% 
-  mutate(primaryReference = getref(Ref.NP)) %>% 
+  mutate(Ref.code = Ref.NP) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) 
+         Group, Genus, Species, Ref.code) 
 
 heb.prot <- data %>% 
   distinct(Group, Genus, Species, Replicate.number,
@@ -218,12 +225,13 @@ heb.prot <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.prot) %>% 
-  mutate(primaryReference = getref(Ref.prot)) %>% 
+  mutate(Ref.code = Ref.prot) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "%")
 
 heb.lip <- data %>% 
@@ -236,12 +244,13 @@ heb.lip <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.lip) %>% 
-  mutate(primaryReference = getref(Ref.lip)) %>% 
+  mutate(Ref.code = Ref.lip) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species) %>% 
+         Group, Genus, Species, Ref.code) %>% 
   mutate(verbatimTraitUnit = "%")
 
 # respiration ++
@@ -259,13 +268,14 @@ heb.resp <- data %>%
          verbatimTraitName = "Respiration.rt.ind",
          verbatimTraitUnit = "µl O2 ind-1 h-1",
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.resp) %>% 
-  mutate(primaryReference = getref(Ref.resp)) %>% 
+  mutate(Ref.code = Ref.resp) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          verbatimTemperature, verbatimTraitUnit,
          secondaryReference, primaryReference, observationNumber,
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
 
 
 heb.Nex <- data %>% 
@@ -297,13 +307,14 @@ heb.Nex <- data %>%
          verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.dm") == TRUE,
                                      "µg N-NH4+ mgDM-1 h-1", verbatimTraitUnit)
          ) %>% 
-  group_by(Ref.N.ex) %>% 
-  mutate(primaryReference = getref(Ref.N.ex)) %>% 
+  mutate(Ref.code = Ref.N.ex) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          verbatimTemperature, verbatimTraitUnit,
          secondaryReference, primaryReference, observationNumber, notes,
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
 
 
 
@@ -337,13 +348,14 @@ heb.Pex <- data %>%
          verbatimTraitUnit = if_else(str_detect(verbatimTraitName, "ug.dm") == TRUE,
                                      "µg P-PO43- mgDM-1 h-1", verbatimTraitUnit)
          ) %>% 
-  group_by(Ref.P.ex) %>% 
-  mutate(primaryReference = getref(Ref.P.ex)) %>% 
+  mutate(Ref.code = Ref.P.ex) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          verbatimTemperature, verbatimTraitUnit,
          secondaryReference, primaryReference, observationNumber, notes,
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
 
 
 heb.NPex <- data %>% 
@@ -356,12 +368,13 @@ heb.NPex <- data %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
-  group_by(Ref.NPex) %>% 
-  mutate(primaryReference = getref(Ref.NPex)) %>% 
+  mutate(Ref.code = as.character(Ref.NPex)) %>% 
+  group_by(Ref.code) %>% 
+  mutate(primaryReference = getref(Ref.code)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber, 
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
 
 # Add some of the marine NP excretion ratios not included in the original database version
 heb.NPex.marine <- read.csv2(f, sep = ";", dec = ",") %>% 
@@ -376,12 +389,13 @@ heb.NPex.marine <- read.csv2(f, sep = ";", dec = ",") %>%
   filter(!is.na(verbatimTraitValue)) %>% 
   mutate(verbatimScientificName = paste(Genus, Species),
          secondaryReference = "Hebert2016") %>% 
+  mutate(Ref.code = as.character(Ref.NPex)) %>% 
   group_by(Ref.NPex) %>% 
   mutate(primaryReference = getref(Ref.NPex)) %>% 
   ungroup() %>% 
   select(verbatimScientificName, verbatimTraitName, verbatimTraitValue,
          secondaryReference, primaryReference, observationNumber, 
-         Group, Genus, Species)
+         Group, Genus, Species, Ref.code)
 
 
 # Determine the associate size value?
@@ -558,7 +572,6 @@ data.rates.ex.P <- heb.long.2 %>%
 # TODO save the dataset into a dataframe 
 
 
-
 ```
 
 
@@ -656,6 +669,9 @@ level0.coli <- data %>%
 # TODO standardize traitNames and Units
 
   left_join(trait.directory,  by = join_by(verbatimTraitName, verbatimTraitUnit)) %>% 
+  filter(verbatimTraitValue != 0) %>% 
+  filter(verbatimTraitValue != "") %>% 
+  mutate(verbatimTraitValue = str_replace(verbatimTraitValue, ",", ".")) %>% 
   mutate(traitValue = verbatimTraitValue) 
     
 save(file = here("dev_files/standardized_datasets_dfs/level0_Colina2016.RData"),
@@ -921,6 +937,218 @@ level0.barn <- read.csv(here("dev_files/literature_data/Barnett 2007 FW zooplank
 save(file =  here("dev_files/standardized_datasets_dfs/level0_Barnett2007.RData"),
      level0.barn, refs2organize.barn)
 ```
+
+
+# Combine all FW trait data
+## Load files
+```{r}
+load(here("dev_files/standardized_datasets_dfs/level0_Hebert2016.RData"))
+load(here("dev_files/standardized_datasets_dfs/level0_Colina2016.RData"))
+load(here("dev_files/standardized_datasets_dfs/level0_BeisnerData.RData"))
+load(here("dev_files/standardized_datasets_dfs/level0_Obertegger2023.RData"))
+load(here("dev_files/standardized_datasets_dfs/level0_Barnett2007.RData"))
+
+```
+
+## Merge reference list
+```{r}
+refs.new <- bind_rows(
+  refs2organize.barn %>%  
+    # select(-Ref.code) %>% 
+    mutate(secondaryReference = "Barnett2007"),
+  refs2organize.coli %>% 
+    select(ref_id = primaryReference, fullCitation) %>% 
+    mutate(secondaryReference = "Colina2016"),
+  refs2organize.heb %>% 
+    mutate(fullCitation = paste(Authors, Year, Title, Journal.Book)) %>% 
+    select(ref_id, fullCitation, Ref.code) %>% 
+    mutate(secondaryReference = "Hebert2016"),
+  refs2organize.ober %>% 
+    filter(ref_id != "") %>% 
+    select(ref_id, fullCitation = Sources, Ref.code) %>% 
+    mutate(Ref.code = as.numeric(Ref.code)) %>% 
+    mutate(secondaryReference = "Obertegger2023") ) %>% 
+ 
+  arrange(ref_id, secondaryReference) %>% 
+  group_by(ref_id) %>% 
+  mutate(ref_id_count = n()) %>% 
+  mutate(rownum = row_number()) %>% 
+  ungroup() %>% 
+  arrange(-ref_id_count) %>% 
+  # Default is to assign with either a/b/c
+  mutate(primaryReference = ref_id) %>% 
+  mutate(ref_id = if_else(ref_id_count > 1,
+                          paste0(ref_id,letters[rownum]),
+                          ref_id)) %>% 
+
+  # Correct the repeated references
+  mutate(ref_id = if_else(ref_id == "DeMott1982c",
+                          "DeMott1982a", ref_id)) %>% 
+  mutate(ref_id = if_else(ref_id == "Porter1980b",
+                          "Porter1980", ref_id)) %>% 
+  mutate(ref_id = if_else(ref_id == "Porter1980a",
+                          "Porter1980", ref_id))
+
+# change the ref_ids in the combined table
+level0.barn <- level0.barn %>% 
+  group_by(referenceCode) %>% 
+  mutate(primaryReference = getref(refval = referenceCode, 
+                                    refs.list = refs.new %>% 
+                                     filter(secondaryReference == "Barnett2007"))) %>% 
+  ungroup()
+
+# Simply switch the primary reference codes
+level0.coli <- level0.coli %>% 
+  left_join(refs.new %>% 
+              filter(secondaryReference == "Colina2016") %>% 
+              filter(ref_id_count > 1) %>% 
+              select(primaryReference, ref_id),
+            by = "primaryReference") %>% 
+  mutate(primaryReference = if_else(!is.na(ref_id),
+                                    ref_id, primaryReference)) %>% 
+  filter(traitValue != "") %>% 
+  select(-ref_id)
+  
+
+# # Correct the Hebert2016 references by changing the reference file itself
+# refs.heb.orig <- read.csv(here("dev_files/literature_data/Hebert2016/references_ed.csv")) %>% 
+#   left_join(refs.new %>% 
+#               filter(secondaryReference == "Hebert2016") %>% 
+#               select(Ref.code, ref_id_new = ref_id)) %>% 
+#   mutate(ref_id = if_else(!is.na(ref_id_new),
+#                           ref_id_new, ref_id)) %>% 
+#   select(-ref_id_new)
+# 
+# write.csv(refs.heb.orig, row.names = F,
+#           file = here("dev_files/literature_data/Hebert2016/references_ed_v2.csv"))
+ 
+
+# TODO annotate later with the DOIs
+
+
+# TODO make sure not references found in the master list
+master.ref <- read.csv(here("data_input/reference_list_2025.csv"))
+refs.new.FW <- refs.new %>% 
+  filter(ref_id %notin% master.ref$referenceCode)
+```
+
+## Merge data frames
+```{r}
+level0.FW <- bind_rows(
+  level0.heb, level0.barn, level0.beis,
+  level0.coli, level0.ober
+) %>% 
+  select(-c(Group, Genus, Species, Ref.code, referenceCode,
+            Species.name, genus, family, Genus))
+
+
+colnames(level0.FW)
+```
+
+
+## Create taxonomy table
+```{r}
+# List species and note duplicates
+taxonomy.FW <- level0.FW %>% 
+  mutate(name = str_replace_all(verbatimScientificName,fixed("."), " ")) %>% 
+  mutate(name = str_replace_all(name, "-", " ")) %>% 
+  mutate(name = str_replace_all(name, "/", " ")) %>% 
+  mutate(name = cleanScientificName(name)) %>% 
+  # rename some names
+  mutate(name = case_when(
+    name == "Daphnia galeata mendotae" ~ "Daphnia galeata",
+    name == "Bosmina longispina maritima" ~ "Bosmina longispina",
+    name == "Diacyclops bicuspifatus thomas" ~ "Diacyclops bicuspidatus",
+    name == "Bosmina liederi longirostris" ~ "Bosmina liederi",
+    name == "Daphnia cucullataxgaleata" ~ "Daphnia cucullata",
+    name == "Daphnia hyalinaxgaleata" ~ "Daphnia hyalina",
+    name == "" ~ "",
+    name == "" ~ "",
+    name == "" ~ "",
+    name == "" ~ "",
+    .default =  name)) %>% 
+  
+  select(verbatimScientificName, name) %>% 
+  group_by(name) %>% 
+  mutate(nrecords = n()) %>% 
+  ungroup() %>% 
+  distinct(name, .keep_all = T)
+
+# Check if in the taxonomy table already
+taxonomy.2023 <- read.csv(here("data_input/taxonomy_table_20230628.csv"))
+
+taxaList.tosearch <- taxonomy.FW %>% 
+  filter(name %notin% taxonomy.2023$scientificName) %>% 
+  arrange(-nrecords)
+
+# TODO find taxonomy information
+library(worrms)
+library(tictoc)
+
+atablenow <- wm_records_taxamatch(name = taxaList.tosearch$name[1])
+atablenow <- plyr::ldply(atablenow, data.frame)
+atablenow <- atablenow[-1,]
+
+tic("sp aphia search")
+for (sp in taxaList.tosearch$name) {
+  x <- tryCatch(wm_records_taxamatch(name = sp,
+                                     marine_only = FALSE),
+                error = function(e)
+                print(paste("No aphia search for",sp)))
+  if (is.list(x) == TRUE) {
+    x <- plyr::ldply(x, data.frame)
+    x$name_search <- sp
+    x <- x %>% 
+      filter(kingdom == "Animalia")
+    
+    if (nrow(x) > 1){
+      print(sp)
+      print(x$AphiaID)
+      x <- x[1,]
+    }
+    
+    atablenow <- rbind(atablenow, x)
+  }
+}
+
+atablenow <- atablenow %>% 
+  rename(aphiaID = valid_AphiaID,
+         scientificName = valid_name)
+toc()
+
+# Which still has no taxonomy info
+no.taxonomy <- taxaList.tosearch %>% 
+  filter(name %notin% atablenow$name)
+
+# TODO Some scientific names are unaccepted or not in Worms at all, so no aphiaID
+
+# Organize to make sure aphiaIDs are not duplicateds
+AA <- atablenow %>% 
+  select(-c(AphiaID:authority)) %>% 
+  # select(colnames(taxonomy.2023))
+  group_by(aphiaID) %>% 
+  filter(n()>1)
+
+# Check matching
+BB <- atablenow %>% 
+  # select(colnames(taxonomy.2023))
+  group_by(aphiaID) %>% 
+  filter(n()==1) %>% 
+  relocate(name_search, scientificName, match_type ) %>% 
+  arrange(match_type)
+# TODO add the taxonomy info to level0.FW and prepare table to append to the main taxonomy table
+
+
+```
+
+## Export all merged files
+```{r}
+save(level0.FW,
+     refs.new.FW,
+     taxonomy.FW)
+
+```
+
 
 
 # --- Extra ---
