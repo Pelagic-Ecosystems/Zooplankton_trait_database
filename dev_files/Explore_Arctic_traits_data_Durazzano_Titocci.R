@@ -6,9 +6,26 @@
 # by T. Durazzano and J. Titocci
 # Source: https://data.lifewatchitaly.eu/entities/dataset/269327ce-690f-493d-b129-03d7a6abb1ea
 
+library(tidyverse)
+`%notin%` <- Negate(`%in%`)
+
 data.fname <- "C:/Users/patri/OneDrive - Université Laval/New_Trait_Data_For_Database/Durazzano_holoplankton_Arctic_traits/Dataset_marine_holoplankton_Arctic.csv"
+refs.fname <- "C:/Users/patri/OneDrive - Université Laval/New_Trait_Data_For_Database/Durazzano_holoplankton_Arctic_traits/Dataset_marine_holoplankton_Arctic_reference_key.csv"
+
+# Additional GZTDv1 files
+s.format <- read.csv(here("data_input/trait_dataset_standard_format_20230628.csv"))[-1,]
+# Taxonomy table
+taxonomy.2023 <- read.csv(here("data_input/taxonomy_table_20230628.csv"))
+
 
 dataset <- read.csv(data.fname, sep = ";")
+
+# Edit the reference list
+refs <- read.csv(refs.fname, sep = ";") %>% 
+  select(-c(X:X.19)) %>% 
+  filter(References != "") %>% 
+  # 7 references have repeated rows and are filtered out, the full refences are similar but could be formatted slightly differently.
+  distinct(DOI, .keep_all = T)
 
 colnames(dataset)
 
@@ -21,7 +38,7 @@ colnames(dataset)
 # After elongation, rare instances of no citation (eg, Themisto compressa mean body length which is midpoint of min and max)
 
 
-# Try to lengthen the data table by trait and then removing blanks.
+# --- Lengthen the data table ---- 
 
 # This extraction only works until column 67. For reproductive traits (68 to 83), the references do not match all the columns and can include minimum and maximum values. Columns 84 to 89 and categorical traits.
 # Simple numeric traits
@@ -80,27 +97,68 @@ BB.clutchSize <- dataset[,c(1:13,79:83)] %>%
 all.data <- bind_rows(AA1, BB.clutchSize, BB.eggSize, BB.reproMode) %>% 
   mutate(valueType = "numeric") %>% 
   mutate(value = as.character(value)) %>% 
-  mutate(secondaryReference = "Durazzano2026") %>% 
+  mutate(secondaryReference = "Durazzano2026",
+         secondaryReferenceDOI = "https://doi.org/10.48372/zzwt-r154") %>% 
+  # Add the categorical data
   bind_rows(AA2 %>% 
               mutate(valueType = "categorical")) %>% 
   
-  # remove no bibliographic citations
+  # remove records with no bibliographic citations
   filter(!is.na(bibliographicCitation)) %>% 
+  
+  # Set verbatim lifestage as combination of lifeStage and sex columns
+  mutate(verbatimLifeStage = paste(lifeStage, sex)) %>% 
+  mutate(verbatimLifeStage = str_remove(verbatimLifeStage, 
+                                        " Undetermined sex")) %>% 
+  # acceptedNameUsageID only retains the aphiaID numbers
+  mutate(acceptedNameUsageID = gsub("\\D", "", acceptedNameUsageID)) %>% 
+  # scientificName is acceptedNameUsage
+  # TODO revise the records for 3 species that changed names
+  rename(verbatimScientificName = acceptedNameUsage) %>% 
+  mutate(scientificName = verbatimScientificName) %>% 
+  # acceptedNameUsageID includes  scientificNameAuthorship
+  mutate(scientificNameAuthorship = str_replace(scientificNameAuthorship, 
+                                                "^(?![\\(]).*(?<![\\)])$", "(\\0)")) %>% 
+  mutate(acceptedNameUsage = paste(scientificName, scientificNameAuthorship)) %>% 
+  select(-c(scientificNameAuthorship, specificEpithet)) %>% 
 
 # rename columns to verbatim values and comments
   rename(verbatimTraitName = traitName,
          verbatimTraitValue = value,
          verbatimNotes = occurrenceRemarks,
-         primaryReferenceDOI = bibliographicCitation)
+         primaryReferenceDOI = bibliographicCitation) %>% 
 
-# TODO verify aphiaIDs and references are in the reference list
+# Update primary reference based on DOI and also includes verbatimLocality
+    # TODO figure out why not all DOIs are joined properly
+  left_join(refs %>% 
+              select(-higherGeographyID),
+            join_by(primaryReferenceDOI == DOI)) %>% 
+    
+  # Remove the catalogNumber here
+    select(-catalogNumber) %>% 
+    
+    # exclude records from the Pata & Hunt (2023) GZTDv1 
+    filter(grepl("10.1002/lno.12478",primaryReferenceDOI) == F) 
+    
+# Reorganize columns to match the standard format
+all.data.standardized <- s.format %>% 
+  bind_rows(all.data)
+
+# verify aphiaIDs and references are in the reference list
+# TODO Append these new taxa to the overall taxonomy table
+new_taxa <- all.data %>% 
+  distinct(scientificName, acceptedNameUsageID, 
+           kingdom, phylum, class, order, family, genus) %>% 
+  filter(acceptedNameUsageID %notin% taxonomy.2023$aphiaID)
+
+# Which columns in the standard GZTDv1 format are not in the long data table?
+setdiff(colnames(s.format), colnames(all.data))
+
+# TODO need verbatimTraitUnits
+# TODO Columns to standardize: lifeStage, traitName, traitValue, traitUnit
+
+# TODO update new references in the overall reference table, make sure full references are not duplicated.
+# TODO Establish the reference codes according to FirstAuthorYear
+
 
 rm(AA1, AA2, BB.clutchSize, BB.eggSize, BB.reproMode)
-
-
-
-# # Inspect taxa-stage with multiple records (for 5 taxa)
-# view(all.data %>% 
-#        group_by(acceptedNameUsage, lifeStage, sex, traitName) %>% 
-#        filter(n() > 1))
-
