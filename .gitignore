@@ -6,4 +6,7 @@ figures/
 scratch_codes.R
 ZPS7_W05_database_exploration.Rmd
 /dev_files/literature_data
-/dev_files
+/dev_files/standardized_datasets_dfs
+dev_files/species_list_to_standardize.csv
+dev_files/traits_list_standardized.csv
+dev_files/traits_list_to_standardize.csv

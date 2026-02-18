@@ -7,6 +7,7 @@
 # Source: https://data.lifewatchitaly.eu/entities/dataset/269327ce-690f-493d-b129-03d7a6abb1ea
 
 library(tidyverse)
+library(here)
 `%notin%` <- Negate(`%in%`)
 
 data.fname <- "C:/Users/patri/OneDrive - Université Laval/New_Trait_Data_For_Database/Durazzano_holoplankton_Arctic_traits/Dataset_marine_holoplankton_Arctic.csv"
@@ -93,7 +94,7 @@ BB.clutchSize <- dataset[,c(1:13,79:83)] %>%
          occurrenceRemarks = "clutchSize_occurrenceRemarks") %>% 
   filter(!is.na(value))
 
-# Combine all data frames (set value to character)
+#  ---- Combine all data frames (set value to character) ----
 all.data <- bind_rows(AA1, BB.clutchSize, BB.eggSize, BB.reproMode) %>% 
   mutate(valueType = "numeric") %>% 
   mutate(value = as.character(value)) %>% 
@@ -121,25 +122,24 @@ all.data <- bind_rows(AA1, BB.clutchSize, BB.eggSize, BB.reproMode) %>%
                                                 "^(?![\\(]).*(?<![\\)])$", "(\\0)")) %>% 
   mutate(acceptedNameUsage = paste(scientificName, scientificNameAuthorship)) %>% 
   select(-c(scientificNameAuthorship, specificEpithet)) %>% 
-
-# rename columns to verbatim values and comments
+  
+  # rename columns to verbatim values and comments
   rename(verbatimTraitName = traitName,
          verbatimTraitValue = value,
          verbatimNotes = occurrenceRemarks,
          primaryReferenceDOI = bibliographicCitation) %>% 
-
-# Update primary reference based on DOI and also includes verbatimLocality
-    # TODO figure out why not all DOIs are joined properly
+  
+  # Update primary reference based on DOI and also includes verbatimLocality
   left_join(refs %>% 
               select(-higherGeographyID),
             join_by(primaryReferenceDOI == DOI)) %>% 
-    
+  
   # Remove the catalogNumber here
-    select(-catalogNumber) %>% 
-    
-    # exclude records from the Pata & Hunt (2023) GZTDv1 
-    filter(grepl("10.1002/lno.12478",primaryReferenceDOI) == F) 
-    
+  select(-catalogNumber) %>% 
+  
+  # exclude records from the Pata & Hunt (2023) GZTDv1 
+  filter(grepl("10.1002/lno.12478",primaryReferenceDOI) == F) 
+
 # Reorganize columns to match the standard format
 all.data.standardized <- s.format %>% 
   bind_rows(all.data)
@@ -160,5 +160,9 @@ setdiff(colnames(s.format), colnames(all.data))
 # TODO update new references in the overall reference table, make sure full references are not duplicated.
 # TODO Establish the reference codes according to FirstAuthorYear
 
+# Export to csv to check tables
+write.csv(all.data.standardized,
+          row.names = F, na = "",
+          file = "dev_files/DurazzanoTitocci2026_temp_standardized_table_20261028.csv")
 
 rm(AA1, AA2, BB.clutchSize, BB.eggSize, BB.reproMode)
